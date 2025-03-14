@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-threat-detection
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ai-threat-detection
+  template:
+    metadata:
+      labels:
+        app: ai-threat-detection
+    spec:
+      containers:
+        - name: ai-threat-detection
+          image: ai-threat-detection
+          ports:
+            - containerPort: 5000
+
