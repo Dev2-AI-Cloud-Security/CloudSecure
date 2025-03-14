@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  ai-threat-detection:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-threat-detection
+    ports:
+      - "5000:5000"
+    restart: always
+
+  db-service:
+    image: mysql:8.0
+    container_name: db-service
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: security_ai
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: adminpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+
+  redis-service:
+    image: redis:latest
+    container_name: redis-service
+    ports:
+      - "6379:6379"
+    restart: always
+
+volumes:
+  db_data:
+
