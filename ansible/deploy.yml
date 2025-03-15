@@ -1,0 +1,51 @@
+---
+- name: Deploy AI Threat Detection to EC2
+  hosts: ai_instances
+  become: yes
+
+  tasks:
+  - name: Update yum cache
+    yum:
+      update_cache: yes
+
+  - name: Install Docker
+    yum:
+      name: docker
+      state: present
+
+  - name: Start and enable Docker service
+    service:
+      name: docker
+      state: started
+      enabled: yes
+
+  - name: Remove old Docker Compose
+    file:
+      path: /usr/local/bin/docker-compose
+      state: absent
+
+  - name: Install Docker Compose
+    get_url:
+      url: https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64
+      dest: /usr/local/bin/docker-compose
+      mode: '0755'
+
+  - name: Create application directory
+    file:
+      path: /app
+      state: directory
+
+  - name: Copy project files
+    copy:
+      src: ../
+      dest: /app/
+
+  - name: Build Docker image
+    command: docker build -t ai-threat-detection /app
+    args:
+      chdir: /app
+
+  - name: Start services with Docker Compose
+    command: docker-compose -f /app/docker-compose.yml up -d
+    args:
+      chdir: /app
