@@ -6,8 +6,10 @@ Install mongodb
 https://www.mongodb.com/docs/manual/installation/
 
 ## Node server
-1. npm init
-2. node index.js
+1. cd server
+2. npm install
+3. npm init
+4. node index.js
 
 ## Start front end
 1. cd client
