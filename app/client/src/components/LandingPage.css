@@ -1,0 +1,143 @@
+.landing-container {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.sidebar {
+  width: 240px;
+  background-color: #fff;
+  padding: 24px 0;
+  border-right: 1px solid #e5e7eb;
+}
+
+.sidebar-title {
+  font-family: "Inter", sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 0 24px;
+  margin-bottom: 32px;
+  color: #111827;
+}
+
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-menu-item {
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  padding: 12px 24px;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.main-content {
+  flex: 1;
+  padding: 32px;
+  background-color: #f8f9fa;
+}
+
+.page-title {
+  font-family: "Inter", sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 24px;
+}
+
+.status-cards {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.status-card {
+  flex: 1;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.card-title {
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #111827;
+  margin-bottom: 16px;
+}
+
+.card-content {
+  height: 150px;
+  background-color: #f3f4f6;
+  border-radius: 4px;
+}
+
+.alerts-panel,
+.insights-panel {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.panel-title {
+  font-family: "Inter", sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 16px;
+}
+
+.alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alert-item {
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  color: #4b5563;
+  padding: 8px 0;
+}
+
+.insights-content {
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+/* Media Queries */
+@media (max-width: 991px) {
+  .status-cards {
+    flex-direction: column;
+  }
+
+  .status-card {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .sidebar {
+    display: none;
+  }
+
+  .main-content {
+    padding: 16px;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .status-card,
+  .alerts-panel,
+  .insights-panel {
+    padding: 16px;
+  }
+}
