@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { api } from '../config/api';
 import "./LoginPage.css";
-
 
 function LoginPage() {
   const [username, setUsername] = useState('');
@@ -10,39 +9,55 @@ function LoginPage() {
   const navigate = useNavigate();
 
   const handleSubmitLogin = async (e) => {
-        e.preventDefault();
-        try {
-          const response = await axios.post('http://localhost:5000/login', { username, password });
-          localStorage.setItem('token', response.data.token);
-          alert('Logged in successfully. Redirecting to landing page');
-          navigate('/LandingPage');
-        } catch (error) {
-          alert(error.response.data.message);
-        }
-      };
-  
-      const handleSubmitRegister = async (e) => {
-        e.preventDefault();
-        try {
-          const response = await axios.post('http://localhost:5000/register', { username, password });
-          localStorage.setItem('token', response.data.token);
-          alert('Registration is successfull. \n You can now login');
-        } catch (error) {
-          alert(error.response.data.message);
-        }
-      };
+    e.preventDefault();
+    try {
+      const response = await api.login({ username, password });
+      if (response && response.token) {
+        localStorage.setItem('token', response.token);
+        alert('Logged in successfully. Redirecting to landing page');
+        navigate('/LandingPage');
+      }
+    } catch (error) {
+      alert(error.message || 'Login failed. Please try again.');
+    }
+  };
+
+  const handleSubmitRegister = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await api.register({ username, password });
+      if (response) {
+        alert('Registration successful. You can now login');
+      }
+    } catch (error) {
+      alert(error.message || 'Registration failed. Please try again.');
+    }
+  };
+
   return (
-    <><div className="login-container">
+    <div className="login-container">
       <div className="login-card">
         <div className="login-title">Login</div>
         <div className="login-form">
           <div className="form-group">
             <div className="form-label">Email / Username</div>
-            <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
+            <input 
+              type="text" 
+              placeholder="Username" 
+              value={username} 
+              onChange={(e) => setUsername(e.target.value)}
+              className="form-input"
+            />
           </div>
           <div className="form-group">
             <div className="form-label">Password</div>
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input 
+              type="password" 
+              placeholder="Password" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)}
+              className="form-input"
+            />
           </div>
           <div className="mfa-option">
             <div className="mfa-toggle">on</div>
@@ -64,12 +79,6 @@ function LoginPage() {
         </div>
       </div>
     </div>
-    {/* <form onSubmit={handleSubmit}>
-             <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)}/>
-             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}/>
-             <button type="submit">Login</button>
-    </form> */}
-    </>
   );
 }
 
