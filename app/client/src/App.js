@@ -4,6 +4,8 @@ import React from "react";
 // import Register from "./components/Register";
 import LoginPage from "./components/LoginPage";
 import LandingPage from "./components/LandingPage";
+import ThreatDash  from "./components/ThreatDash";
+
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 
 const App = () => {
@@ -27,6 +29,7 @@ const App = () => {
         {/* <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} /> */}
         <Route path="/landingPage" element={<LandingPage />} />
+        <Route path="/threatDash" element={<ThreatDash />} />
       </Routes>
     </BrowserRouter>
   );
