@@ -11,3 +11,6 @@ developed.
 # Running the app
 
 Check readme under app folder
+
+# License 
+Is under MIT
