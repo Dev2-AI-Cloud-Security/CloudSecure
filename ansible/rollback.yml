@@ -8,23 +8,24 @@
 
   tasks:
     - name: Stop all containers
-      docker_compose:
-        project_src: "{{ app_dir }}"
-        state: absent
+      command: docker-compose down
+      args:
+        chdir: "{{ app_dir }}"
       ignore_errors: yes
 
     - name: Remove all containers and volumes
-      docker_compose:
-        project_src: "{{ app_dir }}"
-        remove_volumes: yes
-        state: absent
+      command: docker-compose down -v
+      args:
+        chdir: "{{ app_dir }}"
       ignore_errors: yes
 
     - name: Restore MySQL backup if exists
       shell: |
         latest_backup=$(ls -t {{ app_dir }}/backups/mysql_backup_*.sql | head -n1)
         if [ -f "$latest_backup" ]; then
-          docker-compose -f {{ app_dir }}/docker-compose.yml exec -T db-service mysql -u admin -padminpassword security_ai < "$latest_backup"
+          cd {{ app_dir }} && docker-compose up -d db-service
+          sleep 30  # Wait for MySQL to be ready
+          docker-compose exec -T db-service mysql -u admin -padminpassword security_ai < "$latest_backup"
         fi
       args:
         executable: /bin/bash
@@ -34,17 +35,25 @@
       shell: |
         latest_backup=$(ls -t {{ app_dir }}/backups/mongo_backup_*.archive | head -n1)
         if [ -f "$latest_backup" ]; then
-          docker-compose -f {{ app_dir }}/docker-compose.yml exec -T mongo-service mongorestore --uri='mongodb://mongo-user:mongo-password@localhost:27017/cloudsecure?authSource=admin' --archive < "$latest_backup"
+          cd {{ app_dir }} && docker-compose up -d mongo-service
+          sleep 30  # Wait for MongoDB to be ready
+          docker-compose exec -T mongo-service mongorestore --uri='mongodb://mongo-user:mongo-password@localhost:27017/cloudsecure?authSource=admin' --archive < "$latest_backup"
         fi
       args:
         executable: /bin/bash
       ignore_errors: yes
 
-    - name: Rebuild and start containers
-      docker_compose:
-        project_src: "{{ app_dir }}"
-        build: yes
-        state: present
+    - name: Build Docker images
+      command: docker-compose build
+      args:
+        chdir: "{{ app_dir }}"
+      environment:
+        COMPOSE_HTTP_TIMEOUT: "200"
+
+    - name: Start all services
+      command: docker-compose up -d
+      args:
+        chdir: "{{ app_dir }}"
       environment:
         COMPOSE_HTTP_TIMEOUT: "200"
 
@@ -59,12 +68,13 @@
       delay: 10
       ignore_errors: yes
 
-    - name: Check service status
-      docker_compose:
-        project_src: "{{ app_dir }}"
-        state: present
+    - name: Check container status
+      command: docker-compose ps
+      args:
+        chdir: "{{ app_dir }}"
       register: container_status
+      changed_when: false
 
     - name: Display service status
       debug:
-        var: container_status 
+        var: container_status.stdout_lines 
