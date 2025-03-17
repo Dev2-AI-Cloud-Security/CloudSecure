@@ -1,51 +1,163 @@
 ---
-- name: Deploy AI Threat Detection to EC2
-  hosts: ai_instances
+- name: Deploy CloudSecure Application
+  hosts: cloudsecure_instances
   become: yes
 
+  vars:
+    app_dir: /opt/cloudsecure
+    docker_compose_version: "2.29.2"
+    node_version: "18.x"
+
   tasks:
-  - name: Update yum cache
-    yum:
-      update_cache: yes
+    - name: Update package cache
+      yum:
+        update_cache: yes
 
-  - name: Install Docker
-    yum:
-      name: docker
-      state: present
+    - name: Install required packages
+      yum:
+        name:
+          - docker
+          - git
+          - python3-pip
+          - nodejs
+        state: present
 
-  - name: Start and enable Docker service
-    service:
-      name: docker
-      state: started
-      enabled: yes
+    - name: Install Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+        force: yes
 
-  - name: Remove old Docker Compose
-    file:
-      path: /usr/local/bin/docker-compose
-      state: absent
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
 
-  - name: Install Docker Compose
-    get_url:
-      url: https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64
-      dest: /usr/local/bin/docker-compose
-      mode: '0755'
+    - name: Add current user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
 
-  - name: Create application directory
-    file:
-      path: /app
-      state: directory
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
 
-  - name: Copy project files
-    copy:
-      src: ../
-      dest: /app/
+    - name: Copy application files
+      copy:
+        src: ../app/
+        dest: "{{ app_dir }}/app/"
+        mode: '0755'
 
-  - name: Build Docker image
-    command: docker build -t ai-threat-detection /app
-    args:
-      chdir: /app
+    - name: Copy docker-compose file
+      copy:
+        src: ../docker-compose.yml
+        dest: "{{ app_dir }}/docker-compose.yml"
+        mode: '0644'
 
-  - name: Start services with Docker Compose
-    command: docker-compose -f /app/docker-compose.yml up -d
-    args:
-      chdir: /app
+    - name: Create environment files
+      copy:
+        content: |
+          REACT_APP_API_URL=http://localhost:3000
+          NODE_ENV=development
+        dest: "{{ app_dir }}/app/client/.env"
+        mode: '0644'
+
+    - name: Create server environment file
+      copy:
+        content: |
+          PORT=3000
+          NODE_ENV=development
+          DB_HOST=db-service
+          DB_USER=admin
+          DB_PASSWORD=adminpassword
+          DB_NAME=security_ai
+          REDIS_HOST=redis-service
+          MONGODB_URI=mongodb://mongo-user:mongo-password@mongo-service:27017/cloudsecure?authSource=admin
+          CLIENT_URL=http://localhost
+          JWT_SECRET=your-secret-key
+        dest: "{{ app_dir }}/app/server/.env"
+        mode: '0644'
+
+    - name: Pull Docker images
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        pull: yes
+      environment:
+        COMPOSE_HTTP_TIMEOUT: "200"
+
+    - name: Build and start Docker containers
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        build: yes
+        state: present
+      environment:
+        COMPOSE_HTTP_TIMEOUT: "200"
+
+    - name: Ensure containers are running
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        state: present
+      environment:
+        COMPOSE_HTTP_TIMEOUT: "200"
+
+    - name: Wait for services to be ready
+      uri:
+        url: "http://localhost:3000/health"
+        method: GET
+        status_code: 200
+      register: result
+      until: result.status == 200
+      retries: 30
+      delay: 10
+
+    - name: Create backup directory
+      file:
+        path: "{{ app_dir }}/backups"
+        state: directory
+        mode: '0755'
+
+    - name: Setup backup cron job
+      cron:
+        name: "Backup databases"
+        minute: "0"
+        hour: "0"
+        job: "docker-compose -f {{ app_dir }}/docker-compose.yml exec -T db-service mysqldump -u admin -padminpassword security_ai > {{ app_dir }}/backups/mysql_backup_$(date +\\%Y\\%m\\%d).sql && docker-compose -f {{ app_dir }}/docker-compose.yml exec -T mongo-service mongodump --uri='mongodb://mongo-user:mongo-password@localhost:27017/cloudsecure?authSource=admin' --archive > {{ app_dir }}/backups/mongo_backup_$(date +\\%Y\\%m\\%d).archive"
+
+    - name: Setup log rotation
+      copy:
+        content: |
+          /var/lib/docker/containers/*/*.log {
+              rotate 7
+              daily
+              compress
+              missingok
+              delaycompress
+              copytruncate
+          }
+        dest: /etc/logrotate.d/docker-container-logs
+        mode: '0644'
+
+    - name: Configure firewall
+      firewalld:
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+      loop:
+        - 80/tcp
+        - 3000/tcp
+        - 3307/tcp
+        - 27017/tcp
+        - 6379/tcp
+        - 5000/tcp
+      notify: Reload firewall
+
+  handlers:
+    - name: Reload firewall
+      service:
+        name: firewalld
+        state: reloaded

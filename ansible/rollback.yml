@@ -1,0 +1,70 @@
+---
+- name: Rollback CloudSecure Application
+  hosts: cloudsecure_instances
+  become: yes
+
+  vars:
+    app_dir: /opt/cloudsecure
+
+  tasks:
+    - name: Stop all containers
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Remove all containers and volumes
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        remove_volumes: yes
+        state: absent
+      ignore_errors: yes
+
+    - name: Restore MySQL backup if exists
+      shell: |
+        latest_backup=$(ls -t {{ app_dir }}/backups/mysql_backup_*.sql | head -n1)
+        if [ -f "$latest_backup" ]; then
+          docker-compose -f {{ app_dir }}/docker-compose.yml exec -T db-service mysql -u admin -padminpassword security_ai < "$latest_backup"
+        fi
+      args:
+        executable: /bin/bash
+      ignore_errors: yes
+
+    - name: Restore MongoDB backup if exists
+      shell: |
+        latest_backup=$(ls -t {{ app_dir }}/backups/mongo_backup_*.archive | head -n1)
+        if [ -f "$latest_backup" ]; then
+          docker-compose -f {{ app_dir }}/docker-compose.yml exec -T mongo-service mongorestore --uri='mongodb://mongo-user:mongo-password@localhost:27017/cloudsecure?authSource=admin' --archive < "$latest_backup"
+        fi
+      args:
+        executable: /bin/bash
+      ignore_errors: yes
+
+    - name: Rebuild and start containers
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        build: yes
+        state: present
+      environment:
+        COMPOSE_HTTP_TIMEOUT: "200"
+
+    - name: Wait for services to be ready
+      uri:
+        url: "http://localhost:3000/health"
+        method: GET
+        status_code: 200
+      register: result
+      until: result.status == 200
+      retries: 30
+      delay: 10
+      ignore_errors: yes
+
+    - name: Check service status
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        state: present
+      register: container_status
+
+    - name: Display service status
+      debug:
+        var: container_status 
