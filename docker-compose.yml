@@ -41,17 +41,6 @@ services:
     networks:
       - app-network
 
-  ai-threat-detection:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai-threat-detection
-    ports:
-      - "5000:5000"
-    restart: always
-    networks:
-      - app-network
-
   db-service:
     image: mysql:8.0
     container_name: db-service

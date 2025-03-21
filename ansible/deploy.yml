@@ -7,167 +7,198 @@
     app_dir: /opt/cloudsecure
     docker_compose_version: "2.29.2"
     node_version: "18.x"
+    vault_db_user: "your_db_username"
+    vault_db_password: "your_db_password"
+    vault_mongo_user: "your_mongo_username"
+    vault_mongo_password: "your_mongo_password"
+    vault_jwt_secret: "your_jwt_secret"
+
+  pre_tasks:
+  - name: Ensure SSH connection is stable
+    wait_for_connection:
+      delay: 5
+      timeout: 120
 
   tasks:
-    - name: Update package cache
-      yum:
-        update_cache: yes
+  - name: Add Node.js 18.x repository
+    shell: curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
 
-    - name: Install required packages
-      yum:
-        name:
-          - docker
-          - git
-          - python3-pip
-          - nodejs
-        state: present
+  - name: Install required packages
+    yum:
+      name:
+      - docker
+      - git
+      - python3
+      - python3-pip
+      - nodejs
+      state: present
 
-    - name: Install Docker Compose
-      get_url:
-        url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
-        dest: /usr/local/bin/docker-compose
-        mode: '0755'
-        force: yes
+  - name: Install Docker Compose (legacy binary)
+    get_url:
+      url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-{{ ansible_architecture }}"
+      dest: /usr/local/bin/docker-compose
+      mode: '0755'
+      force: yes
 
-    - name: Start and enable Docker service
-      service:
-        name: docker
-        state: started
-        enabled: yes
+  - name: Start and enable Docker service
+    service:
+      name: docker
+      state: started
+      enabled: yes
+    register: docker_service
+    failed_when: docker_service.state != 'started'
 
-    - name: Add current user to docker group
-      user:
-        name: "{{ ansible_user }}"
-        groups: docker
-        append: yes
+  - name: Add current user to docker group
+    user:
+      name: "{{ ansible_user }}"
+      groups: docker
+      append: yes
+    register: user_update
 
-    - name: Create application directory
-      file:
-        path: "{{ app_dir }}"
-        state: directory
-        mode: '0755'
+  - name: Reset SSH connection to apply group changes
+    meta: reset_connection
+    when: user_update.changed
 
-    - name: Copy application files
-      copy:
-        src: ../app/
-        dest: "{{ app_dir }}/app/"
-        mode: '0755'
+  - name: Create application directory
+    file:
+      path: "{{ app_dir }}"
+      state: directory
+      mode: '0755'
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
 
-    - name: Copy docker-compose file
-      copy:
-        src: ../docker-compose.yml
-        dest: "{{ app_dir }}/docker-compose.yml"
-        mode: '0644'
+  - name: Copy application files (excluding node_modules)
+    ansible.posix.synchronize:
+      src: ../app/
+      dest: "{{ app_dir }}/app/"
+      mode: push
+      rsync_opts:
+      - "--exclude=node_modules/**"
+      - "--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r"
+    register: copy_result
+    retries: 3
+    delay: 5
+    until: copy_result is succeeded
 
-    - name: Create environment files
-      copy:
-        content: |
-          REACT_APP_API_URL=http://localhost:3000
-          NODE_ENV=development
-        dest: "{{ app_dir }}/app/client/.env"
-        mode: '0644'
+  - name: Copy docker-compose file
+    copy:
+      src: ../docker-compose.yml
+      dest: "{{ app_dir }}/docker-compose.yml"
+      mode: '0644'
 
-    - name: Create server environment file
-      copy:
-        content: |
-          PORT=3000
-          NODE_ENV=development
-          DB_HOST=db-service
-          DB_USER=admin
-          DB_PASSWORD=adminpassword
-          DB_NAME=security_ai
-          REDIS_HOST=redis-service
-          MONGODB_URI=mongodb://mongo-user:mongo-password@mongo-service:27017/cloudsecure?authSource=admin
-          CLIENT_URL=http://localhost
-          JWT_SECRET=your-secret-key
-        dest: "{{ app_dir }}/app/server/.env"
-        mode: '0644'
+  - name: Create client environment file
+    copy:
+      content: |
+        REACT_APP_API_URL=http://localhost:3000
+        NODE_ENV=development
+      dest: "{{ app_dir }}/app/client/.env"
+      mode: '0644'
 
-    - name: Pull Docker images
-      command: docker-compose pull
-      args:
-        chdir: "{{ app_dir }}"
-      environment:
-        COMPOSE_HTTP_TIMEOUT: "200"
+  - name: Create server environment file
+    copy:
+      content: |
+        PORT=3000
+        NODE_ENV=development
+        DB_HOST=db-service
+        DB_USER={{ vault_db_user }}
+        DB_PASSWORD={{ vault_db_password }}
+        DB_NAME=security_ai
+        REDIS_HOST=redis-service
+        MONGODB_URI=mongodb://{{ vault_mongo_user }}:{{ vault_mongo_password }}@mongo-service:27017/cloudsecure?authSource=admin
+        CLIENT_URL=http://localhost
+        JWT_SECRET={{ vault_jwt_secret }}
+      dest: "{{ app_dir }}/app/server/.env"
+      mode: '0644'
 
-    - name: Build Docker images
-      command: docker-compose build
-      args:
-        chdir: "{{ app_dir }}"
-      environment:
-        COMPOSE_HTTP_TIMEOUT: "200"
+  - name: Wait for Docker to be ready
+    command: docker info
+    retries: 5
+    delay: 5
+    register: docker_ready
+    until: docker_ready.rc == 0
 
-    - name: Start Docker containers
-      command: docker-compose up -d
-      args:
-        chdir: "{{ app_dir }}"
-      environment:
-        COMPOSE_HTTP_TIMEOUT: "200"
+  - name: Remove legacy Docker Compose binary if exists
+    file:
+      path: /usr/local/bin/docker-compose
+      state: absent
 
-    - name: Check if containers are running
-      command: docker-compose ps
-      args:
-        chdir: "{{ app_dir }}"
-      register: container_status
-      changed_when: false
+  - name: Create directory for Docker CLI plugins
+    file:
+      path: /usr/local/lib/docker/cli-plugins
+      state: directory
+      mode: '0755'
 
-    - name: Display container status
-      debug:
-        var: container_status.stdout_lines
+  - name: Download Docker Compose v2 plugin binary
+    get_url:
+      url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-{{ ansible_architecture }}"
+      dest: /usr/local/lib/docker/cli-plugins/docker-compose
+      mode: '0755'
+      force: yes
 
-    - name: Wait for services to be ready
-      uri:
-        url: "http://localhost:3000/health"
-        method: GET
-        status_code: 200
-      register: result
-      until: result.status == 200
-      retries: 30
-      delay: 10
+  - name: Run Docker Compose
+    community.docker.docker_compose_v2:
+      project_src: "{{ app_dir }}"
+      pull: always
+      build: always
+      state: present
+      recreate: auto
+    environment:
+      COMPOSE_HTTP_TIMEOUT: "200"
 
-    - name: Create backup directory
-      file:
-        path: "{{ app_dir }}/backups"
-        state: directory
-        mode: '0755'
+  - name: Check if containers are running
+    command: docker compose ps
+    args:
+      chdir: "{{ app_dir }}"
+    register: container_status
+    changed_when: false
 
-    - name: Setup backup cron job
-      cron:
-        name: "Backup databases"
-        minute: "0"
-        hour: "0"
-        job: "cd {{ app_dir }} && docker-compose exec -T db-service mysqldump -u admin -padminpassword security_ai > {{ app_dir }}/backups/mysql_backup_$(date +\\%Y\\%m\\%d).sql && docker-compose exec -T mongo-service mongodump --uri='mongodb://mongo-user:mongo-password@localhost:27017/cloudsecure?authSource=admin' --archive > {{ app_dir }}/backups/mongo_backup_$(date +\\%Y\\%m\\%d).archive"
+  - name: Display container status
+    debug:
+      var: container_status.stdout_lines
 
-    - name: Setup log rotation
-      copy:
-        content: |
-          /var/lib/docker/containers/*/*.log {
-              rotate 7
-              daily
-              compress
-              missingok
-              delaycompress
-              copytruncate
-          }
-        dest: /etc/logrotate.d/docker-container-logs
-        mode: '0644'
+  - name: Create backup directory
+    file:
+      path: "{{ app_dir }}/backups"
+      state: directory
+      mode: '0755'
+  - name: Ensure firewalld is started
+    service:
+      name: firewalld
+      state: started
+      enabled: yes
 
-    - name: Configure firewall
-      firewalld:
-        port: "{{ item }}"
-        permanent: yes
-        state: enabled
-      loop:
-        - 80/tcp
-        - 3000/tcp
-        - 3307/tcp
-        - 27017/tcp
-        - 6379/tcp
-        - 5000/tcp
-      notify: Reload firewall
+  - name: Install cronie to provide crontab command
+    yum:
+      name: cronie
+      state: present
 
-  handlers:
-    - name: Reload firewall
-      service:
-        name: firewalld
-        state: reloaded
+  - name: Setup backup cron job
+    cron:
+      name: "Backup databases"
+      minute: "0"
+      hour: "0"
+      job: "cd {{ app_dir }} && docker compose exec -T db-service mysqldump -u {{ vault_db_user }} -p{{ vault_db_password }} security_ai > {{ app_dir }}/backups/mysql_backup_$(date +\\%Y\\%m\\%d).sql && docker compose exec -T mongo-service mongodump --uri='mongodb://{{ vault_mongo_user }}:{{ vault_mongo_password }}@mongo-service:27017/cloudsecure?authSource=admin' --archive > {{ app_dir }}/backups/mongo_backup_$(date +\\%Y\\%m\\%d).archive"
+
+  - name: Setup backup cron job
+    cron:
+      name: "Backup databases"
+      minute: "0"
+      hour: "0"
+      job: "cd {{ app_dir }} && docker compose exec -T db-service mysqldump -u {{ vault_db_user }} -p{{ vault_db_password }} security_ai > {{ app_dir }}/backups/mysql_backup_$(date +\\%Y\\%m\\%d).sql && docker compose exec -T mongo-service mongodump --uri='mongodb://{{ vault_mongo_user }}:{{ vault_mongo_password }}@mongo-service:27017/cloudsecure?authSource=admin' --archive > {{ app_dir }}/backups/mongo_backup_$(date +\\%Y\\%m\\%d).archive"
+
+  - name: Setup log rotation
+    copy:
+      content: |
+        /var/lib/docker/containers/*/*.log {
+            rotate 7
+            daily
+            compress
+            missingok
+            delaycompress
+            copytruncate
+        }
+      dest: /etc/logrotate.d/docker-container-logs
+      mode: '0644'
+    notify: Run logrotate
+  - name: Run logrotate
+    command: logrotate /etc/logrotate.d/docker-container-logs
