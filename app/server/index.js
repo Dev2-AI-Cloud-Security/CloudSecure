@@ -1,9 +1,13 @@
 // index.js
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+require('dotenv').config(); // Load environment variables
+
 const { mysqlConnection, connectMongoDB } = require('./db');
 const authController = require('./controllers/authController');
+const { chatBot } = require('./controllers/chatController'); // ✅ NEW: chatbot controller
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -16,7 +20,7 @@ const corsOptions = {
   exposedHeaders: ['Content-Length', 'X-Requested-With'],
   credentials: true,
   optionsSuccessStatus: 200,
-  maxAge: 3600
+  maxAge: 3600,
 };
 
 // Middleware
@@ -39,19 +43,19 @@ app.use((req, res, next) => {
 // Connect to databases
 connectMongoDB()
   .then(() => {
-    console.log('Connected to MongoDB');
-    
+    console.log('✅ Connected to MongoDB');
+
     // Test MySQL connection
     mysqlConnection.connect((err) => {
       if (err) {
-        console.error('MySQL Connection Error:', err);
+        console.error('❌ MySQL Connection Error:', err);
         return;
       }
-      console.log('Connected to MySQL');
+      console.log('✅ Connected to MySQL');
     });
   })
   .catch(err => {
-    console.error('Failed to connect to MongoDB:', err);
+    console.error('❌ Failed to connect to MongoDB:', err);
     process.exit(1);
   });
 
@@ -63,16 +67,18 @@ app.get('/health', (req, res) => {
 // API routes
 app.post('/register', authController.registerUser);
 app.post('/login', authController.loginUser);
+app.post('/chat', chatBot); // ✅ NEW: OpenAI chatbot route
 
-// Error handling middleware
+// Global error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('❌ Error:', err.stack);
   res.status(500).json({
     status: 'error',
     message: err.message || 'Internal Server Error'
   });
 });
 
+// Start server
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`🚀 Server running on port ${port}`);
 });
