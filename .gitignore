@@ -1,0 +1,55 @@
+# Ignore sensitive files
+*.pem
+*.key
+*.env
+*.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+secrets.yml
+secrets.yaml
+
+# Ignore Node.js dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore build output
+/build
+/dist
+/.next
+/out
+
+# Ignore logs
+logs
+*.log
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Ignore IDE files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Ignore Docker temporary files
+.docker
+
+# Ignore Terraform state files
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+
+# Ignore Ansible retry files
+*.retry
+ansible/*.retry
+
+# Ignore local development configurations
+local_settings.py
