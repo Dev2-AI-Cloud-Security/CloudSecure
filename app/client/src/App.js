@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LoginPage from "./components/LoginPage";
 import LandingPage from "./components/LandingPage";
 import ThreatDash from "./components/ThreatDash";
+import UserManagement from "./components/UserManagement/UserManagement.tsx"
 
 const App = () => {
   const [showChat, setShowChat] = useState(false);
@@ -46,6 +47,8 @@ const App = () => {
         <Route path="/" element={<LoginPage />} />
         <Route path="/landingPage" element={<LandingPage />} />
         <Route path="/threatDash" element={<ThreatDash />} />
+        <Route path="/users" element={<UserManagement />} />
+        
       </Routes>
 
       {/* Floating Chatbot */}
