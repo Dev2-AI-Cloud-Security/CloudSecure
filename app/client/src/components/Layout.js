@@ -11,7 +11,7 @@ function Layout({ children }) {
         <div className="sidebar-title">AI in Cloud Security</div>
         <div className="sidebar-menu">
           <div className="sidebar-menu-item" onClick={() => navigate('/threatdash')}>Threat Monitoring</div>
-          <div className="sidebar-menu-item" >Infrastructure</div>
+          <div className="sidebar-menu-item" onClick={() => navigate('/infra')}>Infrastructure</div>
           <div className="sidebar-menu-item" onClick={() => navigate('/users')}>User Management</div>
           <div className="sidebar-menu-item">Settings</div>
         </div>

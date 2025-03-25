@@ -10,11 +10,16 @@ import { DashboardLayout } from '@toolpad/core/DashboardLayout';
 import { useDemoRouter } from '@toolpad/core/internal';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 
+import HomeIcon from '@mui/icons-material/Home';
+import SecurityIcon from '@mui/icons-material/Security';
+import ComputerIcon from '@mui/icons-material/Computer';
+import PeopleIcon from '@mui/icons-material/People';
 // import UserManagement from './components/UserManagement/UserManagement.';
 import Logo from './assets/brand_logo.webp';
+const TerraformForm = lazy(() => import('./components/TerraformPage'));
 const LandingPage = lazy(() => import('./components/LandingPage'));
-const ThreatMonitoring = lazy(() => import('./components/ThreatDash'));
-const UserManagement = lazy(() => import('./components/UserManagement/UserManagement.tsx'));
+const ThreatMonitoring = lazy(() => import('./components/ThreatMain.js'));
+const UserManagement = lazy(() => import('./components/UserManagement/layout.js'));
 
 const NAVIGATION = [
   {
@@ -24,22 +29,22 @@ const NAVIGATION = [
   {
     segment: 'landing',
     title: 'Home Page',
-    icon: <DashboardIcon />,
+    icon: <HomeIcon />,
   },
   {
     segment: 'threatdash',
     title: 'Threat Monitoring',
-    icon: <DashboardIcon />,
+    icon: <SecurityIcon />,
   },
   {
     segment: 'infra',
     title: 'Infrastructure',
-    icon: <DashboardIcon />,
+    icon: <ComputerIcon />,
   },
   {
     segment: 'users',
     title: 'User Management',
-    icon: <DashboardIcon />,
+    icon: <PeopleIcon />,
   }
  
 ];
@@ -73,7 +78,9 @@ function DemoPageContent({ pathname }) {
     case '/users':
       Component = UserManagement;
       break;
-
+    case '/infra':
+      Component = TerraformForm;
+      break;
     default:
       Component = () => (
         <div style={{ padding: 20, textAlign: 'center' }}>
@@ -95,7 +102,7 @@ DemoPageContent.propTypes = {
 
 function AppLayout(props) {
   const { window } = props;
-  const router = useDemoRouter('/dashboard');
+  const router = useDemoRouter('/landing');
   const demoWindow = window !== undefined ? window() : undefined;
   const [showChat, setShowChat] = useState(false);
   const [messages, setMessages] = useState([]);
