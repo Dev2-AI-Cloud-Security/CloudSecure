@@ -1,9 +1,12 @@
 import React, {useState} from "react";
+import "./LandingPage.css"
 import "./ThreatDash.css"
+
 function ThreatDash() {
 	const [input1, onChangeInput1] = useState('');
 	return (
 		<div className="contain">
+
 			<div className="scroll-view">
 				<div className="view">
 					<span className="text" >

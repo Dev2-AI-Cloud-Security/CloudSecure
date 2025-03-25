@@ -1,12 +1,10 @@
 import React, { useState } from "react";
-import { useNavigate } from 'react-router-dom';
 
 import "./LandingPage.css";
 
 function LandingPage() {
   const [selectedCard, setSelectedCard] = useState(null);
   const [selectedAlert, setSelectedAlert] = useState(null);
-  const navigate = useNavigate();
   const threatData = {
     "Active Threats": [
       "Malware detected on Server 3",
@@ -32,15 +30,6 @@ function LandingPage() {
 
   return (
     <div className="landing-container" style={{ backgroundColor: "#F5F5F5" }}>
-      <div className="sidebar" style={{ backgroundColor: "#B0E0E6", color: "black" }}>
-        <div className="sidebar-title">AI in Cloud Security</div>
-        <div className="sidebar-menu">
-          <div className="sidebar-menu-item" onClick={() => navigate('/threatdash')}>Threat Monitoring</div>
-          <div className="sidebar-menu-item" >Infrastructure</div>
-          <div className="sidebar-menu-item" onClick={() => navigate('/users')}>User Management</div>
-          <div className="sidebar-menu-item">Settings</div>
-        </div>
-      </div>
       <div className="main-content" style={{ backgroundColor: "#FFFFFF" }}>
         <div className="page-title" style={{ color: "#4682B4" }}>Security Status Overview</div>
         <div className="status-cards">

@@ -1,117 +1,121 @@
-import React, { useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import LoginPage from "./components/LoginPage";
-import LandingPage from "./components/LandingPage";
-import ThreatDash from "./components/ThreatDash";
-import UserManagement from "./components/UserManagement/UserManagement.tsx"
+import * as React from 'react';
+import PropTypes from 'prop-types';
+import { lazy, Suspense } from 'react';
+import { createTheme } from '@mui/material/styles';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import { AppProvider } from '@toolpad/core/AppProvider';
+import { DashboardLayout } from '@toolpad/core/DashboardLayout';
+import { useDemoRouter } from '@toolpad/core/internal';
+// import UserManagement from './components/UserManagement/UserManagement.';
+import Logo from './assets/brand_logo.webp';
+const LandingPage = lazy(() => import('./components/LandingPage'));
+const ThreatMonitoring = lazy(() => import('./components/ThreatDash'));
+const UserManagement = lazy(() => import('./components/UserManagement/UserManagement.tsx'));
 
-const App = () => {
-  const [showChat, setShowChat] = useState(false);
-  const [messages, setMessages] = useState([]);
+const NAVIGATION = [
+  {
+    kind: 'header',
+    title: 'AI in Cloud Security',
+  },
+  {
+    segment: 'landing',
+    title: 'Home Page',
+    icon: <DashboardIcon />,
+  },
+  {
+    segment: 'threatdash',
+    title: 'Threat Monitoring',
+    icon: <DashboardIcon />,
+  },
+  {
+    segment: 'infra',
+    title: 'Infrastructure',
+    icon: <DashboardIcon />,
+  },
+  {
+    segment: 'users',
+    title: 'User Management',
+    icon: <DashboardIcon />,
+  }
+ 
+];
 
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
+const demoTheme = createTheme({
+  cssVariables: {
+    colorSchemeSelector: 'data-toolpad-color-scheme',
+  },
+  colorSchemes: { light: true, dark: true },
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 600,
+      md: 600,
+      lg: 1200,
+      xl: 1536,
+    },
+  },
+});
 
-  const toggleChat = () => {
-    setShowChat(!showChat);
-  };
+function DemoPageContent({ pathname }) {
+  let Component;
 
-  const sendMessage = async () => {
-    const input = document.getElementById("userInput");
-    const message = input.value.trim();
-    if (!message) return;
+  switch (pathname) {
+    case '/landing':
+      Component = LandingPage;
+      break;
+    case '/threatdash':
+      Component = ThreatMonitoring;
+      break;
+    case '/users':
+      Component = UserManagement;
+      break;
 
-    setMessages((prev) => [...prev, { sender: "You", text: message }]);
-    input.value = "";
-
-    try {
-      const res = await fetch(`${API_URL}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      });
-
-      const data = await res.json();
-      setMessages((prev) => [...prev, { sender: "Bot", text: data.reply }]);
-    } catch (error) {
-      setMessages((prev) => [
-        ...prev,
-        { sender: "Bot", text: "Error contacting chatbot server." },
-      ]);
-      console.error("Chatbot error:", error);
-    }
-  };
+    default:
+      Component = () => (
+        <div style={{ padding: 20, textAlign: 'center' }}>
+          <h2>Page Not Found</h2>
+        </div>
+      );
+  }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LoginPage />} />
-        <Route path="/landingPage" element={<LandingPage />} />
-        <Route path="/threatDash" element={<ThreatDash />} />
-        <Route path="/users" element={<UserManagement />} />
-        
-      </Routes>
-
-      {/* Floating Chatbot */}
-      <div
-        id="chatbot-toggle"
-        onClick={toggleChat}
-        style={{
-          position: "fixed",
-          bottom: "20px",
-          right: "20px",
-          background: "#007bff",
-          color: "white",
-          padding: "10px",
-          borderRadius: "50%",
-          cursor: "pointer",
-          zIndex: 1000,
-        }}
-      >
-        💬
-      </div>
-
-      {showChat && (
-        <div
-          id="chatbot-container"
-          style={{
-            position: "fixed",
-            bottom: "80px",
-            right: "20px",
-            width: "300px",
-            maxHeight: "400px",
-            background: "white",
-            border: "1px solid #ccc",
-            borderRadius: "10px",
-            overflow: "auto",
-            zIndex: 1000,
-            padding: "10px",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <div
-            id="chatbox"
-            style={{ height: "300px", overflowY: "scroll", marginBottom: "10px" }}
-          >
-            {messages.map((msg, idx) => (
-              <div key={idx}>
-                <b>{msg.sender}:</b> {msg.text}
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: "5px" }}>
-            <input
-              type="text"
-              id="userInput"
-              placeholder="Ask something..."
-              style={{ flex: 1 }}
-            />
-            <button onClick={sendMessage}>Send</button>
-          </div>
-        </div>
-      )}
-    </BrowserRouter>
+    <Suspense fallback={<div>Loading...</div>}>
+      <Component />
+    </Suspense>
   );
+}
+
+DemoPageContent.propTypes = {
+  pathname: PropTypes.string.isRequired,
 };
 
-export default App;
+function AppLayout(props) {
+  const { window } = props;
+  const router = useDemoRouter('/dashboard');
+  const demoWindow = window !== undefined ? window() : undefined;
+
+  return (
+    <AppProvider
+      branding={{
+        logo: <img src={Logo} alt="Cloud secure" />,
+        title: 'ClourSecure',
+        homeUrl: '/',
+      }}
+      navigation={NAVIGATION}
+      router={router}
+      theme={demoTheme}
+      window={demoWindow}
+    >
+      <DashboardLayout>
+        <DemoPageContent pathname={router.pathname} />
+      </DashboardLayout>
+    </AppProvider>
+  );
+}
+
+AppLayout.propTypes = {
+  window: PropTypes.func,
+};
+
+export default AppLayout;
