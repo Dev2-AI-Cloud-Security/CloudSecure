@@ -8,6 +8,7 @@ The solution will utilize AWS for cloud infrastructure, Kubernetes for orchestra
 Ansible for configuration management and automation. Additionally, Figma will be used
 for user experience modelling to enhance the usability of the cybersecurity tools
 developed.
+<img width="1497" alt="image" src="https://github.com/user-attachments/assets/a177f61a-5d7f-4bf9-beb3-ad2ac93d7114" />
 
 # Running the app
 
