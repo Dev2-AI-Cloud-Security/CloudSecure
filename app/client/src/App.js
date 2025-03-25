@@ -99,7 +99,7 @@ function AppLayout(props) {
     <AppProvider
       branding={{
         logo: <img src={Logo} alt="Cloud secure" />,
-        title: 'ClourSecure',
+        title: 'CloudSecure',
         homeUrl: '/',
       }}
       navigation={NAVIGATION}
