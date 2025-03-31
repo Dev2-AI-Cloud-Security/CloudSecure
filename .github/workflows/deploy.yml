@@ -3,7 +3,7 @@ name: Deploy CloudSecure to AWS EC2
 on:
   push:
     branches:
-      - release
+      - main
 
 jobs:
   deploy:
@@ -149,7 +149,7 @@ jobs:
             mkdir -p /home/ec2-user/cloudsecure
             export NODE_OPTIONS='--max-old-space-size=4096'
             docker-compose down --remove-orphans
-            docker-compose up --build -d
+            
           EOF
 
           # Copy Docker files to EC2
