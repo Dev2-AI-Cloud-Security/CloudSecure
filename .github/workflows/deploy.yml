@@ -19,7 +19,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'  # Matches react-router@7.4.1 requirement
-
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+      - name: Install Dependencies and Build
+        run: |
+          npm install
+          npm run build  # Adjust if your app has a build step
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
       # Set up Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3  # Updated to latest version
@@ -140,6 +147,9 @@ jobs:
 
             # Create directory
             mkdir -p /home/ec2-user/cloudsecure
+            export NODE_OPTIONS='--max-old-space-size=4096'
+            docker-compose down --remove-orphans
+            docker-compose up --build -d
           EOF
 
           # Copy Docker files to EC2
