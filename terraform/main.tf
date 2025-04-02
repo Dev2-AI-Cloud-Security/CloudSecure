@@ -56,10 +56,11 @@ resource "aws_instance" "cloudsecure" {
   subnet_id              = data.aws_subnet.default.id
   vpc_security_group_ids = [data.aws_security_group.cloudsecure_sg.id]
 
-  # Increase root volume size to 10 GiB
+  # Explicitly set root volume to 10 GiB
   root_block_device {
     volume_size = 10 # GiB
-    volume_type = "gp3" # General Purpose SSD, Free Tier-eligible
+    volume_type = "gp3"
+    delete_on_termination = true
   }
 
   user_data = <<-EOF
@@ -69,6 +70,9 @@ resource "aws_instance" "cloudsecure" {
               systemctl start docker
               systemctl enable docker
               usermod -aG docker ec2-user
+              # Resize filesystem to use full volume
+              growpart /dev/xvda 1
+              xfs_growfs /
               EOF
 
   tags = {
@@ -80,14 +84,12 @@ resource "aws_instance" "cloudsecure" {
   }
 }
 
-# Variable for instance count
 variable "instance_count" {
   description = "Number of instances to create if none exist"
   type        = number
   default     = 1
 }
 
-# Output the public IP of the instance
 output "instance_ip" {
   description = "Public IP of the cloudsecure instance"
   value       = length(aws_instance.cloudsecure) > 0 ? aws_instance.cloudsecure[0].public_ip : (length(data.aws_instances.existing_instances.public_ips) > 0 ? data.aws_instances.existing_instances.public_ips[0] : null)

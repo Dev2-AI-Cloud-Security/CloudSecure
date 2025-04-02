@@ -10,11 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Set up Node.js (for app dependencies)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -22,7 +20,6 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      # Install app dependencies
       - name: Install Dependencies
         run: |
           cd app
@@ -30,13 +27,11 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      # Set up Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.9.0
 
-      # Configure AWS Credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -44,17 +39,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      # Initialize Terraform
       - name: Terraform Init
         working-directory: ./terraform
         run: terraform init
 
-      # Apply Terraform (create or update EC2)
+      # Force refresh of Terraform state and apply
       - name: Terraform Apply
         working-directory: ./terraform
-        run: terraform apply -auto-approve
+        run: |
+          terraform apply -auto-approve -refresh=true
 
-      # Get EC2 instance IP
       - name: Get EC2 IP
         id: ec2-ip
         working-directory: ./terraform
@@ -66,13 +60,11 @@ jobs:
           fi
           echo "ip=$IP" >> $GITHUB_OUTPUT
 
-      # Install SSH key for EC2 access
       - name: Install SSH Key
         run: |
           echo "${{ secrets.EC2_SSH_KEY }}" > /home/runner/key.pem
           chmod 400 /home/runner/key.pem
 
-      # Wait for EC2 to be ready (SSH port open)
       - name: Wait for EC2 Instance
         run: |
           echo "Waiting for EC2 instance to be ready..."
@@ -89,17 +81,15 @@ jobs:
             exit 1
           fi
 
-      # Deploy Docker Compose to EC2
       - name: Deploy Docker Compose
         run: |
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
-            # Ensure Docker is installed and running
+            # Verify disk space after launch
+            df -h /
             sudo dnf update -y
             sudo dnf install -y docker
             sudo systemctl start docker
             sudo systemctl enable docker
-
-            # Add ec2-user to docker group
             sudo groupadd docker || true
             sudo usermod -aG docker ec2-user
 
@@ -118,32 +108,21 @@ jobs:
               exit 1
             fi
 
-            # Clean up Docker to free space
+            # Clean up Docker
             sudo docker system prune -f --volumes || true
 
             # Install Docker Compose
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
-            echo "Docker Compose installed: $(/usr/local/bin/docker-compose --version)"
 
-            # Create app directory
             mkdir -p /home/ec2-user/cloudsecure
           EOF
 
-          # Copy app and docker-compose.yml to EC2
           scp -i /home/runner/key.pem -r ./app ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
           scp -i /home/runner/key.pem ./docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
 
-          # Run Docker Compose
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
             cd /home/ec2-user/cloudsecure
-            df -h /  # Check disk space
+            df -h /  # Check space before build
             sudo /usr/local/bin/docker-compose up -d --build || {
-              echo "Docker Compose failed. Checking logs..."
-              sudo docker ps -a
-              df -h /  # Show disk space after failure
-              exit 1
-            }
-            echo "Docker Compose deployed successfully!"
-            sudo docker ps -a
-          EOF
+              echo "Docker Compose failed.
