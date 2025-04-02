@@ -43,7 +43,6 @@ jobs:
         working-directory: ./terraform
         run: terraform init
 
-      # Force refresh of Terraform state and apply
       - name: Terraform Apply
         working-directory: ./terraform
         run: |
@@ -84,8 +83,9 @@ jobs:
       - name: Deploy Docker Compose
         run: |
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
-            # Verify disk space after launch
+            # Check initial disk size and user_data log
             df -h /
+            cat /home/ec2-user/disk_size.log || echo "No disk size log found"
             sudo dnf update -y
             sudo dnf install -y docker
             sudo systemctl start docker
@@ -108,13 +108,9 @@ jobs:
               exit 1
             fi
 
-            # Clean up Docker
             sudo docker system prune -f --volumes || true
-
-            # Install Docker Compose
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
-
             mkdir -p /home/ec2-user/cloudsecure
           EOF
 
@@ -123,6 +119,13 @@ jobs:
 
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
             cd /home/ec2-user/cloudsecure
-            df -h /  # Check space before build
+            df -h /
             sudo /usr/local/bin/docker-compose up -d --build || {
-              echo "Docker Compose failed.
+              echo "Docker Compose failed. Checking logs..."
+              sudo docker ps -a
+              df -h /
+              exit 1
+            }
+            echo "Docker Compose deployed successfully!"
+            sudo docker ps -a
+          EOF

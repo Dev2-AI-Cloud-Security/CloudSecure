@@ -58,26 +58,31 @@ resource "aws_instance" "cloudsecure" {
 
   # Explicitly set root volume to 10 GiB
   root_block_device {
-    volume_size = 10 # GiB
-    volume_type = "gp3"
+    volume_size           = 10 # GiB
+    volume_type           = "gp3"
     delete_on_termination = true
   }
 
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y
-              dnf install -y docker
+              dnf install -y docker cloud-utils-growpart
               systemctl start docker
               systemctl enable docker
               usermod -aG docker ec2-user
-              # Resize filesystem to use full volume
-              growpart /dev/xvda 1
-              xfs_growfs /
+              # Resize partition and filesystem
+              growpart /dev/xvda 1 || echo "growpart failed"
+              xfs_growfs / || echo "xfs_growfs failed"
+              # Log disk size for debugging
+              df -h / > /home/ec2-user/disk_size.log
               EOF
 
   tags = {
     Name = "cloudsecure-instance"
   }
+
+  # Force recreation if AMI or volume changes
+  depends_on = [data.aws_ami.amazon_linux_2023]
 
   lifecycle {
     create_before_destroy = true
