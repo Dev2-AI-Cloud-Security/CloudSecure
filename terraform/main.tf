@@ -1,11 +1,45 @@
+# Configure the AWS provider
 provider "aws" {
   region = "us-east-1"
 }
 
-# Reference the existing security group
-data "aws_security_group" "cloudsecure_sg" {
-  name   = "cloudsecure-sg"
-  vpc_id = "vpc-06ba180dc12d2a77a"
+# Fetch the default VPC
+data "aws_vpc" "default" {
+  default = true
+}
+
+# Fetch the default subnet in the default VPC (pick one availability zone)
+data "aws_subnet" "default" {
+  vpc_id            = data.aws_vpc.default.id
+  availability_zone = "us-east-1a" # Adjust if needed
+  default_for_az    = true
+}
+
+# Create a new security group in the default VPC
+resource "aws_security_group" "cloudsecure_sg" {
+  name        = "cloudsecure-sg"
+  description = "Security group for cloudsecure instance"
+  vpc_id      = data.aws_vpc.default.id
+
+  # Allow SSH access (port 22) from anywhere
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "cloudsecure-sg"
+  }
 }
 
 # Fetch the latest Amazon Linux 2023 AMI
@@ -36,11 +70,12 @@ data "aws_instances" "existing_instances" {
 # Create EC2 instance only if no existing instances are found
 resource "aws_instance" "cloudsecure" {
   count         = length(data.aws_instances.existing_instances.ids) == 0 ? var.instance_count : 0
-  ami           = data.aws_ami.amazon_linux_2023.id # Use Amazon Linux 2023 AMI
+  ami           = data.aws_ami.amazon_linux_2023.id
   instance_type = "t2.micro"
-  key_name      = "cloudsecure-key"
+  key_name      = "cloudsecure-key" # Must create this manually in AWS Console
 
-  vpc_security_group_ids = [data.aws_security_group.cloudsecure_sg.id]
+  subnet_id              = data.aws_subnet.default.id
+  vpc_security_group_ids = [aws_security_group.cloudsecure_sg.id]
 
   user_data = <<-EOF
               #!/bin/bash
@@ -60,10 +95,15 @@ resource "aws_instance" "cloudsecure" {
   }
 }
 
+# Variable for instance count
 variable "instance_count" {
-  default = 1
+  description = "Number of instances to create if none exist"
+  type        = number
+  default     = 1
 }
 
+# Output the public IP of the instance
 output "instance_ip" {
-  value = length(aws_instance.cloudsecure) > 0 ? aws_instance.cloudsecure[0].public_ip : (length(data.aws_instances.existing_instances.public_ips) > 0 ? data.aws_instances.existing_instances.public_ips[0] : null)
+  description = "Public IP of the cloudsecure instance"
+  value       = length(aws_instance.cloudsecure) > 0 ? aws_instance.cloudsecure[0].public_ip : (length(data.aws_instances.existing_instances.public_ips) > 0 ? data.aws_instances.existing_instances.public_ips[0] : null)
 }
