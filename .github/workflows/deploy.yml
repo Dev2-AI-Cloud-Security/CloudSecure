@@ -93,14 +93,35 @@ jobs:
       - name: Deploy Docker Compose
         run: |
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
-            # Install Docker (already done via user_data in Terraform, but ensure it’s running)
+            # Ensure Docker is installed and running (reinforce user_data)
+            sudo dnf update -y
+            sudo dnf install -y docker
             sudo systemctl start docker
             sudo systemctl enable docker
+
+            # Add ec2-user to docker group and ensure it’s applied
+            sudo groupadd docker || true  # Create group if it doesn’t exist
             sudo usermod -aG docker ec2-user
+
+            # Wait for Docker daemon to be ready
+            echo "Waiting for Docker daemon..."
+            for i in {1..30}; do
+              if sudo docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
+                echo "Docker daemon is ready!"
+                break
+              fi
+              echo "Waiting... ($i/30)"
+              sleep 5
+            done
+            if ! sudo docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
+              echo "Error: Docker daemon not running after 2.5 minutes"
+              exit 1
+            fi
 
             # Install Docker Compose
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
+            echo "Docker Compose installed: $(/usr/local/bin/docker-compose --version)"
 
             # Create app directory
             mkdir -p /home/ec2-user/cloudsecure
@@ -110,9 +131,14 @@ jobs:
           scp -i /home/runner/key.pem -r ./app ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
           scp -i /home/runner/key.pem ./docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
 
-          # Run Docker Compose
+          # Run Docker Compose with sudo to avoid group issues
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
             cd /home/ec2-user/cloudsecure
-            newgrp docker || true  # Apply group changes
-            docker-compose up -d --build
+            # Use sudo for Docker commands to bypass group refresh issues
+            sudo /usr/local/bin/docker-compose up -d --build || {
+              echo "Docker Compose failed. Checking logs..."
+              sudo docker ps -a
+              exit 1
+            }
+            echo "Docker Compose deployed successfully!"
           EOF
