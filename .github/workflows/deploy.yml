@@ -18,14 +18,15 @@ jobs:
         with:
           node-version: '20'
         env:
-          NODE_OPTIONS: --max-old-space-size=4096
+          NODE_OPTIONS: --max-old-space-size=6144  # Increase to 6 GB
 
       - name: Install Dependencies
         run: |
           cd app
-          npm install
+          echo "Node memory settings: $NODE_OPTIONS"
+          npm install --loglevel=verbose  # Add verbose output for debugging
         env:
-          NODE_OPTIONS: --max-old-space-size=4096
+          NODE_OPTIONS: --max-old-space-size=6144  # Ensure 6 GB heap
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -83,7 +84,6 @@ jobs:
       - name: Deploy Docker Compose
         run: |
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
-            # Log disk size and resize results
             df -h /
             cat /home/ec2-user/resize.log || echo "No resize log found"
             sudo dnf update -y
