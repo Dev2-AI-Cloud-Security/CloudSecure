@@ -37,18 +37,8 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
-# Check for existing instances with the tag Name=cloudsecure-instance
-data "aws_instances" "existing_instances" {
-  instance_tags = {
-    Name = "cloudsecure-instance"
-  }
-
-  instance_state_names = ["running"]
-}
-
-# Create EC2 instance only if no existing instances are found
+# Create EC2 instance with a unique tag to force recreation
 resource "aws_instance" "cloudsecure" {
-  count         = length(data.aws_instances.existing_instances.ids) == 0 ? var.instance_count : 0
   ami           = data.aws_ami.amazon_linux_2023.id
   instance_type = "t2.micro"
   key_name      = "cloudsecure-key"
@@ -56,7 +46,7 @@ resource "aws_instance" "cloudsecure" {
   subnet_id              = data.aws_subnet.default.id
   vpc_security_group_ids = [data.aws_security_group.cloudsecure_sg.id]
 
-  # Explicitly set root volume to 10 GiB
+  # Set root volume to 10 GiB
   root_block_device {
     volume_size           = 10 # GiB
     volume_type           = "gp3"
@@ -71,31 +61,25 @@ resource "aws_instance" "cloudsecure" {
               systemctl enable docker
               usermod -aG docker ec2-user
               # Resize partition and filesystem
-              growpart /dev/xvda 1 || echo "growpart failed"
-              xfs_growfs / || echo "xfs_growfs failed"
-              # Log disk size for debugging
-              df -h / > /home/ec2-user/disk_size.log
+              echo "Resizing partition..." > /home/ec2-user/resize.log
+              growpart /dev/xvda 1 >> /home/ec2-user/resize.log 2>&1 || echo "growpart failed" >> /home/ec2-user/resize.log
+              echo "Resizing filesystem..." >> /home/ec2-user/resize.log
+              xfs_growfs / >> /home/ec2-user/resize.log 2>&1 || echo "xfs_growfs failed" >> /home/ec2-user/resize.log
+              df -h / >> /home/ec2-user/resize.log
               EOF
 
   tags = {
-    Name = "cloudsecure-instance"
+    Name = "cloudsecure-instance-${timestamp()}" # Unique tag to force recreation
   }
-
-  # Force recreation if AMI or volume changes
-  depends_on = [data.aws_ami.amazon_linux_2023]
 
   lifecycle {
     create_before_destroy = true
   }
-}
 
-variable "instance_count" {
-  description = "Number of instances to create if none exist"
-  type        = number
-  default     = 1
+  depends_on = [data.aws_ami.amazon_linux_2023]
 }
 
 output "instance_ip" {
   description = "Public IP of the cloudsecure instance"
-  value       = length(aws_instance.cloudsecure) > 0 ? aws_instance.cloudsecure[0].public_ip : (length(data.aws_instances.existing_instances.public_ips) > 0 ? data.aws_instances.existing_instances.public_ips[0] : null)
+  value       = aws_instance.cloudsecure.public_ip
 }
