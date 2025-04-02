@@ -20,21 +20,13 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
-      - name: Install Dependencies
+      - name: Build React App
         run: |
           cd app
           echo "Node memory settings: $NODE_OPTIONS"
           free -m
-          if [ -f "package-lock.json" ]; then
-            echo "Using npm ci..."
-            npm ci --loglevel=verbose || {
-              echo "npm ci failed, falling back to npm install..."
-              npm install --loglevel=verbose
-            }
-          else
-            echo "No package-lock.json, running npm install..."
-            npm install --loglevel=verbose
-          fi
+          npm ci --loglevel=verbose
+          npm run build
           free -m
         env:
           NODE_OPTIONS: --max-old-space-size=6144
@@ -120,17 +112,20 @@ jobs:
             sudo docker system prune -f --volumes || true
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
+            echo "Docker Compose version: $(/usr/local/bin/docker-compose --version)"
             mkdir -p /home/ec2-user/cloudsecure
           EOF
 
-          scp -i /home/runner/key.pem -r ./app ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
+          scp -i /home/runner/key.pem -r ./app/build ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/build
+          scp -i /home/runner/key.pem ./app/package.json ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
+          scp -i /home/runner/key.pem ./app/server.js ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
           scp -i /home/runner/key.pem ./docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
 
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
             cd /home/ec2-user/cloudsecure
             df -h /
-            free -m  # Log EC2 memory
-            sudo /usr/local/bin/docker-compose up -d --build --build-arg NODE_OPTIONS="--max-old-space-size=4096" || {
+            free -m
+            sudo /usr/local/bin/docker-compose up -d --build || {
               echo "Docker Compose failed. Checking logs..."
               sudo docker ps -a
               df -h /
