@@ -12,30 +12,33 @@ jobs:
     steps:
       # Checkout the repository
       - name: Checkout code
-        uses: actions/checkout@v4  # Updated to latest version
+        uses: actions/checkout@v4
 
-      # Set up Node.js (required for building app if it uses modern packages)
+      # Set up Node.js (for app dependencies)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'  # Matches react-router@7.4.1 requirement
+          node-version: '20'
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-      - name: Install Dependencies and Build
+
+      # Install app dependencies (skip build if not needed)
+      - name: Install Dependencies
         run: |
+          cd app  # Adjust if your app directory is different
           npm install
-          npm run build  # Adjust if your app has a build step
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
       # Set up Terraform
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3  # Updated to latest version
+        uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.9.0  # Updated to a more recent stable version (as of March 2025)
+          terraform_version: 1.9.0
 
       # Configure AWS Credentials
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4  # Updated to latest version
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -61,7 +64,7 @@ jobs:
             echo "No running EC2 instance found and none created. Exiting."
             exit 1
           fi
-          echo "ip=$IP" >> $GITHUB_OUTPUT  # Updated syntax for GitHub Actions outputs
+          echo "ip=$IP" >> $GITHUB_OUTPUT
 
       # Install SSH key for EC2 access
       - name: Install SSH Key
@@ -69,14 +72,7 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > /home/runner/key.pem
           chmod 400 /home/runner/key.pem
 
-      # Debug SSH Key and Connection (limited output for security)
-      - name: Debug SSH Connection
-        run: |
-          echo "Verifying SSH key and connection..."
-          ssh-keygen -y -f /home/runner/key.pem > /dev/null || (echo "Invalid SSH key format" && exit 1)
-          ssh -v -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} "echo 'SSH successful'" || (echo "SSH connection failed" && exit 1)
-
-      # Wait for EC2 to be ready
+      # Wait for EC2 to be ready (SSH port open)
       - name: Wait for EC2 Instance
         run: |
           echo "Waiting for EC2 instance to be ready..."
@@ -93,84 +89,30 @@ jobs:
             exit 1
           fi
 
-      # Build and Deploy Docker Containers
+      # Deploy Docker Compose to EC2
       - name: Deploy Docker Compose
         run: |
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
-            # Debug OS information
-            echo "OS Information:"
-            cat /etc/os-release || echo "OS info unavailable"
-            echo "User: $(whoami)"
-
-            # Install Docker based on OS
-            if [[ -f /etc/os-release ]]; then
-              . /etc/os-release
-              case $ID in
-                amzn)
-                  if [[ $VERSION_ID =~ ^2 ]]; then
-                    # Amazon Linux 2
-                    sudo yum update -y
-                    sudo amazon-linux-extras install docker -y
-                  else
-                    # Amazon Linux 2023
-                    sudo dnf update -y
-                    sudo dnf install -y docker
-                  fi
-                  ;;
-                ubuntu)
-                  # Ubuntu
-                  sudo apt-get update -y
-                  sudo apt-get install -y docker.io
-                  ;;
-                *)
-                  echo "Unsupported OS: $ID"
-                  exit 1
-                  ;;
-              esac
-            else
-              echo "Cannot determine OS. /etc/os-release not found."
-              exit 1
-            fi
-
-            # Start and enable Docker
+            # Install Docker (already done via user_data in Terraform, but ensure it’s running)
             sudo systemctl start docker
             sudo systemctl enable docker
-
-            # Add ec2-user to docker group
-            sudo groupadd -f docker
             sudo usermod -aG docker ec2-user
 
-            # Install Docker Compose (updated to latest version dynamically)
+            # Install Docker Compose
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
-            echo "Docker Compose version: $(docker-compose --version)"
 
-            # Create directory
+            # Create app directory
             mkdir -p /home/ec2-user/cloudsecure
-            export NODE_OPTIONS='--max-old-space-size=4096'
-            docker-compose down --remove-orphans
-            
           EOF
 
-          # Copy Docker files to EC2
+          # Copy app and docker-compose.yml to EC2
           scp -i /home/runner/key.pem -r ./app ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
-          scp -i /home/runner/key.pem docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
+          scp -i /home/runner/key.pem ./docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
 
-          # Build and run Docker Compose in a new SSH session
+          # Run Docker Compose
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
-            # Ensure Docker group changes are applied (re-login simulation)
-            newgrp docker || true
-
-            # Verify Docker access
-            if ! docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
-              echo "ec2-user cannot access Docker daemon. Check group membership."
-              groups
-              exit 1
-            fi
-            echo "Docker daemon accessible."
-
-            # Run Docker Compose
             cd /home/ec2-user/cloudsecure
-            docker-compose down --remove-orphans
-            docker-compose up --build -d
+            newgrp docker || true  # Apply group changes
+            docker-compose up -d --build
           EOF
