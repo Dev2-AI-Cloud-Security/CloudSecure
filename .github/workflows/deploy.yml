@@ -32,7 +32,6 @@ jobs:
             echo "No package-lock.json found, falling back to npm install..."
             npm install --loglevel=verbose
           fi
-          # Temporarily disable CI flag to treat ESLint warnings as warnings
           CI=false npm run build
           free -m
         env:
@@ -123,10 +122,10 @@ jobs:
             mkdir -p /home/ec2-user/cloudsecure
           EOF
 
-          scp -i /home/runner/key.pem -r ./app/client/build ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/build
-          scp -i /home/runner/key.pem ./app/client/package.json ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
-          scp -i /home/runner/key.pem ./app/client/server.js ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
-          scp -i /home/runner/key.pem ./app/client/Dockerfile ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
+          scp -i /home/runner/key.pem -r ./app/client/build ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/client/build
+          scp -i /home/runner/key.pem ./app/server/package.json ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
+          scp -i /home/runner/key.pem ./app/server/server.js ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
+          scp -i /home/runner/key.pem ./app/server/Dockerfile ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
           scp -i /home/runner/key.pem ./docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
 
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
