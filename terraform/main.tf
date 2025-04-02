@@ -8,38 +8,17 @@ data "aws_vpc" "default" {
   default = true
 }
 
-# Fetch the default subnet in the default VPC (pick one availability zone)
+# Fetch the default subnet in the default VPC
 data "aws_subnet" "default" {
   vpc_id            = data.aws_vpc.default.id
   availability_zone = "us-east-1a" # Adjust if needed
   default_for_az    = true
 }
 
-# Create a new security group in the default VPC
-resource "aws_security_group" "cloudsecure_sg" {
-  name        = "cloudsecure-sg"
-  description = "Security group for cloudsecure instance"
-  vpc_id      = data.aws_vpc.default.id
-
-  # Allow SSH access (port 22) from anywhere
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Allow all outbound traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "cloudsecure-sg"
-  }
+# Reference the existing security group
+data "aws_security_group" "cloudsecure_sg" {
+  name   = "cloudsecure-sg"
+  vpc_id = data.aws_vpc.default.id
 }
 
 # Fetch the latest Amazon Linux 2023 AMI
@@ -72,10 +51,10 @@ resource "aws_instance" "cloudsecure" {
   count         = length(data.aws_instances.existing_instances.ids) == 0 ? var.instance_count : 0
   ami           = data.aws_ami.amazon_linux_2023.id
   instance_type = "t2.micro"
-  key_name      = "cloudsecure-key" # Must create this manually in AWS Console
+  key_name      = "cloudsecure-key"
 
   subnet_id              = data.aws_subnet.default.id
-  vpc_security_group_ids = [aws_security_group.cloudsecure_sg.id]
+  vpc_security_group_ids = [data.aws_security_group.cloudsecure_sg.id]
 
   user_data = <<-EOF
               #!/bin/bash
