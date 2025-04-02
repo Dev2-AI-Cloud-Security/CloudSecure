@@ -25,7 +25,13 @@ jobs:
           cd app/client
           echo "Node memory settings: $NODE_OPTIONS"
           free -m
-          npm ci --loglevel=verbose
+          if [ -f "package-lock.json" ]; then
+            echo "Using npm ci..."
+            npm ci --loglevel=verbose
+          else
+            echo "No package-lock.json found, falling back to npm install..."
+            npm install --loglevel=verbose
+          fi
           npm run build
           free -m
         env:
