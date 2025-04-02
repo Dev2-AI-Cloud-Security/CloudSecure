@@ -18,15 +18,26 @@ jobs:
         with:
           node-version: '20'
         env:
-          NODE_OPTIONS: --max-old-space-size=6144  # Increase to 6 GB
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Install Dependencies
         run: |
           cd app
           echo "Node memory settings: $NODE_OPTIONS"
-          npm install --loglevel=verbose  # Add verbose output for debugging
+          free -m  # Log available memory before install
+          if [ -f "package-lock.json" ]; then
+            echo "Using npm ci for faster install..."
+            npm ci --loglevel=verbose || {
+              echo "npm ci failed, falling back to npm install..."
+              npm install --loglevel=verbose
+            }
+          else
+            echo "No package-lock.json found, running npm install..."
+            npm install --loglevel=verbose
+          fi
+          free -m  # Log memory after install
         env:
-          NODE_OPTIONS: --max-old-space-size=6144  # Ensure 6 GB heap
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
