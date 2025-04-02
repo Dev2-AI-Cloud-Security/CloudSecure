@@ -32,7 +32,18 @@ jobs:
             echo "No package-lock.json found, falling back to npm install..."
             npm install --loglevel=verbose
           fi
-          CI=false npm run build
+          echo "Running npm run build..."
+          CI=false npm run build > build.log 2>&1 || {
+            echo "npm run build failed. See build.log for details:"
+            cat build.log
+            exit 1
+          }
+          if [ ! -d "build" ]; then
+            echo "Error: build directory not found after npm run build"
+            exit 1
+          fi
+          echo "Build directory contents:"
+          ls -la build
           free -m
         env:
           NODE_OPTIONS: --max-old-space-size=6144
