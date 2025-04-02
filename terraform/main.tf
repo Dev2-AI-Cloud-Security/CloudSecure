@@ -56,6 +56,12 @@ resource "aws_instance" "cloudsecure" {
   subnet_id              = data.aws_subnet.default.id
   vpc_security_group_ids = [data.aws_security_group.cloudsecure_sg.id]
 
+  # Increase root volume size to 10 GiB
+  root_block_device {
+    volume_size = 10 # GiB
+    volume_type = "gp3" # General Purpose SSD, Free Tier-eligible
+  }
+
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y

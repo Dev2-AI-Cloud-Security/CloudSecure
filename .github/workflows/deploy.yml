@@ -22,10 +22,10 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      # Install app dependencies (skip build if not needed)
+      # Install app dependencies
       - name: Install Dependencies
         run: |
-          cd app  # Adjust if your app directory is different
+          cd app
           npm install
         env:
           NODE_OPTIONS: --max-old-space-size=4096
@@ -93,17 +93,17 @@ jobs:
       - name: Deploy Docker Compose
         run: |
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
-            # Ensure Docker is installed and running (reinforce user_data)
+            # Ensure Docker is installed and running
             sudo dnf update -y
             sudo dnf install -y docker
             sudo systemctl start docker
             sudo systemctl enable docker
 
-            # Add ec2-user to docker group and ensure it’s applied
-            sudo groupadd docker || true  # Create group if it doesn’t exist
+            # Add ec2-user to docker group
+            sudo groupadd docker || true
             sudo usermod -aG docker ec2-user
 
-            # Wait for Docker daemon to be ready
+            # Wait for Docker daemon
             echo "Waiting for Docker daemon..."
             for i in {1..30}; do
               if sudo docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
@@ -118,6 +118,9 @@ jobs:
               exit 1
             fi
 
+            # Clean up Docker to free space
+            sudo docker system prune -f --volumes || true
+
             # Install Docker Compose
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
@@ -131,14 +134,16 @@ jobs:
           scp -i /home/runner/key.pem -r ./app ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
           scp -i /home/runner/key.pem ./docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
 
-          # Run Docker Compose with sudo to avoid group issues
+          # Run Docker Compose
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
             cd /home/ec2-user/cloudsecure
-            # Use sudo for Docker commands to bypass group refresh issues
+            df -h /  # Check disk space
             sudo /usr/local/bin/docker-compose up -d --build || {
               echo "Docker Compose failed. Checking logs..."
               sudo docker ps -a
+              df -h /  # Show disk space after failure
               exit 1
             }
             echo "Docker Compose deployed successfully!"
+            sudo docker ps -a
           EOF
