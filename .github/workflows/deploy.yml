@@ -22,6 +22,7 @@ jobs:
 
       - name: Build React App
         run: |
+          set -e  # Exit on any error
           cd app/client
           echo "Node memory settings: $NODE_OPTIONS"
           free -m
@@ -53,6 +54,7 @@ jobs:
           }
           if [ ! -d "build" ]; then
             echo "Error: build directory not found after npm run build"
+            ls -la
             exit 1
           fi
           echo "Build directory contents:"
