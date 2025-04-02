@@ -20,22 +20,14 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
-      - name: Install Dependencies
+      - name: Build React App
         run: |
           cd app
           echo "Node memory settings: $NODE_OPTIONS"
-          free -m  # Log available memory before install
-          if [ -f "package-lock.json" ]; then
-            echo "Using npm ci for faster install..."
-            npm ci --loglevel=verbose || {
-              echo "npm ci failed, falling back to npm install..."
-              npm install --loglevel=verbose
-            }
-          else
-            echo "No package-lock.json found, running npm install..."
-            npm install --loglevel=verbose
-          fi
-          free -m  # Log memory after install
+          free -m
+          npm ci --loglevel=verbose  # Use package-lock.json for efficiency
+          npm run build
+          free -m
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
@@ -57,8 +49,7 @@ jobs:
 
       - name: Terraform Apply
         working-directory: ./terraform
-        run: |
-          terraform apply -auto-approve -refresh=true
+        run: terraform apply -auto-approve -refresh=true
 
       - name: Get EC2 IP
         id: ec2-ip
@@ -124,16 +115,21 @@ jobs:
             mkdir -p /home/ec2-user/cloudsecure
           EOF
 
-          scp -i /home/runner/key.pem -r ./app ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
+          # Copy only the build folder and necessary files
+          scp -i /home/runner/key.pem -r ./app/build ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/build
+          scp -i /home/runner/key.pem ./app/package.json ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
+          scp -i /home/runner/key.pem ./app/server.js ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
           scp -i /home/runner/key.pem ./docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
 
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
             cd /home/ec2-user/cloudsecure
             df -h /
+            free -m
             sudo /usr/local/bin/docker-compose up -d --build || {
               echo "Docker Compose failed. Checking logs..."
               sudo docker ps -a
               df -h /
+              free -m
               exit 1
             }
             echo "Docker Compose deployed successfully!"
