@@ -25,13 +25,26 @@ jobs:
           cd app/client
           echo "Node memory settings: $NODE_OPTIONS"
           free -m
+          echo "Current directory: $(pwd)"
+          echo "Directory contents before install:"
+          ls -la
           if [ -f "package-lock.json" ]; then
             echo "Using npm ci..."
-            npm ci --loglevel=verbose
+            npm ci --loglevel=verbose > npm-install.log 2>&1 || {
+              echo "npm ci failed. See npm-install.log for details:"
+              cat npm-install.log
+              exit 1
+            }
           else
             echo "No package-lock.json found, falling back to npm install..."
-            npm install --loglevel=verbose
+            npm install --loglevel=verbose > npm-install.log 2>&1 || {
+              echo "npm install failed. See npm-install.log for details:"
+              cat npm-install.log
+              exit 1
+            }
           fi
+          echo "Directory contents after install:"
+          ls -la
           echo "Running npm run build..."
           CI=false npm run build > build.log 2>&1 || {
             echo "npm run build failed. See build.log for details:"

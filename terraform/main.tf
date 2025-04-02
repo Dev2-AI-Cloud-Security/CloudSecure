@@ -61,11 +61,13 @@ resource "aws_instance" "cloudsecure" {
               systemctl enable docker
               usermod -aG docker ec2-user
               # Resize partition and filesystem
-              echo "Resizing partition..." > /home/ec2-user/resize.log
+              echo "Resizing partition..." > /home/ec2-user/resize.log 2>&1
               growpart /dev/xvda 1 >> /home/ec2-user/resize.log 2>&1 || echo "growpart failed" >> /home/ec2-user/resize.log
-              echo "Resizing filesystem..." >> /home/ec2-user/resize.log
+              echo "Resizing filesystem..." >> /home/ec2-user/resize.log 2>&1
               xfs_growfs / >> /home/ec2-user/resize.log 2>&1 || echo "xfs_growfs failed" >> /home/ec2-user/resize.log
-              df -h / >> /home/ec2-user/resize.log
+              df -h / >> /home/ec2-user/resize.log 2>&1
+              # Ensure the log is readable
+              chmod 644 /home/ec2-user/resize.log
               EOF
 
   tags = {
