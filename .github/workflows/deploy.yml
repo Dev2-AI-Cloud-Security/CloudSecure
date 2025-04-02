@@ -20,13 +20,21 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
-      - name: Build React App
+      - name: Install Dependencies
         run: |
           cd app
           echo "Node memory settings: $NODE_OPTIONS"
           free -m
-          npm ci --loglevel=verbose  # Use package-lock.json for efficiency
-          npm run build
+          if [ -f "package-lock.json" ]; then
+            echo "Using npm ci..."
+            npm ci --loglevel=verbose || {
+              echo "npm ci failed, falling back to npm install..."
+              npm install --loglevel=verbose
+            }
+          else
+            echo "No package-lock.json, running npm install..."
+            npm install --loglevel=verbose
+          fi
           free -m
         env:
           NODE_OPTIONS: --max-old-space-size=6144
@@ -115,17 +123,14 @@ jobs:
             mkdir -p /home/ec2-user/cloudsecure
           EOF
 
-          # Copy only the build folder and necessary files
-          scp -i /home/runner/key.pem -r ./app/build ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/build
-          scp -i /home/runner/key.pem ./app/package.json ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
-          scp -i /home/runner/key.pem ./app/server.js ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
+          scp -i /home/runner/key.pem -r ./app ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
           scp -i /home/runner/key.pem ./docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
 
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
             cd /home/ec2-user/cloudsecure
             df -h /
-            free -m
-            sudo /usr/local/bin/docker-compose up -d --build || {
+            free -m  # Log EC2 memory
+            sudo /usr/local/bin/docker-compose up -d --build --build-arg NODE_OPTIONS="--max-old-space-size=4096" || {
               echo "Docker Compose failed. Checking logs..."
               sudo docker ps -a
               df -h /
