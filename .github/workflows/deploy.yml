@@ -72,13 +72,32 @@ jobs:
             app/client/npm-install.log
             app/client/build.log
 
+      - name: Verify Build Directory Before Deployment
+        run: |
+          set -e
+          echo "Current directory: $(pwd)"
+          echo "Verifying build directory exists..."
+          if [ ! -d "app/client/build" ]; then
+            echo "Error: app/client/build directory not found"
+            ls -la app/client
+            exit 1
+          fi
+          echo "app/client/build directory contents:"
+          ls -la app/client/build
+
+      - name: Upload Build Directory as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-directory
+          path: app/client/build
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.9.0
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
