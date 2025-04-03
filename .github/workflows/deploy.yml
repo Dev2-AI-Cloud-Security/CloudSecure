@@ -3,7 +3,7 @@ name: Deploy CloudSecure to AWS EC2
 on:
   push:
     branches:
-      - cicd-v2
+      - main
 
 jobs:
   deploy:
@@ -26,7 +26,7 @@ jobs:
           cd app/client
           npm install --loglevel=verbose > npm-install.log 2>&1 || { cat npm-install.log; exit 1; }
           CI=false npm run build > build.log 2>&1 || { cat build.log; exit 1; }
-          ls -la build  # Confirm build directory exists
+          ls -la build
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
@@ -45,8 +45,68 @@ jobs:
             app/client/npm-install.log
             app/client/build.log
 
-      # Other steps (Terraform, AWS credentials, etc.) remain unchanged
-      # ...
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: ./terraform
+        run: |
+          terraform apply -auto-approve -refresh=true
+          terraform state list  # Debug: List resources in state
+
+      - name: Get EC2 IP
+        id: ec2-ip
+        working-directory: ./terraform
+        run: |
+          IP=$(terraform output -raw instance_ip | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' || echo "")
+          if [ -z "$IP" ]; then
+            echo "Error: Failed to retrieve EC2 instance IP. Terraform outputs:"
+            terraform output
+            echo "Terraform state:"
+            terraform state list
+            exit 1
+          fi
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+          echo "EC2 IP: $IP"
+
+      - name: Install SSH Key
+        run: |
+          if [ -z "${{ secrets.EC2_SSH_KEY }}" ]; then
+            echo "Error: EC2_SSH_KEY secret is not set or empty"
+            exit 1
+          fi
+          echo "${{ secrets.EC2_SSH_KEY }}" > /home/runner/key.pem
+          chmod 400 /home/runner/key.pem
+          ls -la /home/runner/key.pem  # Debug: Confirm key file exists
+
+      - name: Wait for EC2 Instance
+        run: |
+          echo "Waiting for EC2 instance to be ready at ${{ steps.ec2-ip.outputs.ip }}..."
+          for i in {1..60}; do
+            if nc -v -w 5 -z ${{ steps.ec2-ip.outputs.ip }} 22 2>&1; then
+              echo "EC2 is ready!"
+              break
+            fi
+            echo "Waiting... ($i/60)"
+            sleep 10
+          done
+          if ! nc -w 5 -z ${{ steps.ec2-ip.outputs.ip }} 22; then
+            echo "Error: EC2 not reachable after 10 minutes"
+            exit 1
+          fi
 
       - name: Download Build Directory
         uses: actions/download-artifact@v4
@@ -56,6 +116,8 @@ jobs:
 
       - name: Deploy Docker Compose
         run: |
+          cd $GITHUB_WORKSPACE
+          ls -la app/client/build
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
             sudo dnf update -y
             sudo dnf install -y docker
@@ -66,8 +128,6 @@ jobs:
             sudo chmod +x /usr/local/bin/docker-compose
             mkdir -p /home/ec2-user/cloudsecure
           EOF
-          cd $GITHUB_WORKSPACE
-          ls -la app/client/build  # Verify build directory is present
           scp -i /home/runner/key.pem -r ./app/client/build ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/client/build
           scp -i /home/runner/key.pem ./app/server/package.json ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
           scp -i /home/runner/key.pem ./app/server/server.js ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
