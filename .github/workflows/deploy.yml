@@ -46,6 +46,8 @@ jobs:
           fi
           echo "Directory contents after install:"
           ls -la
+          echo "Public directory contents:"
+          ls -la public || echo "Public directory not found"
           echo "Running npm run build..."
           CI=false npm run build > build.log 2>&1 || {
             echo "npm run build failed. See build.log for details:"
