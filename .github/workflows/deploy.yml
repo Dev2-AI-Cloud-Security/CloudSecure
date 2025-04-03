@@ -3,7 +3,7 @@ name: Deploy CloudSecure to AWS EC2
 on:
   push:
     branches:
-      - cicd-v2
+      - main
 
 jobs:
   deploy:
@@ -129,6 +129,11 @@ jobs:
             mkdir -p /home/ec2-user/cloudsecure
           EOF
 
+          # Ensure we're in the root directory
+          cd $GITHUB_WORKSPACE
+          echo "Current directory before SCP: $(pwd)"
+          echo "Confirming build directory exists:"
+          ls -la app/client/build || echo "Build directory not found"
           scp -i /home/runner/key.pem -r ./app/client/build ec2-user@3.81.16.213:/home/ec2-user/cloudsecure/app/client/build
           scp -i /home/runner/key.pem ./app/server/package.json ec2-user@3.81.16.213:/home/ec2-user/cloudsecure/app/server/
           scp -i /home/runner/key.pem ./app/server/server.js ec2-user@3.81.16.213:/home/ec2-user/cloudsecure/app/server/
