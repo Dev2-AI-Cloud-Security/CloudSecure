@@ -170,6 +170,11 @@ jobs:
             mkdir -p /home/ec2-user/cloudsecure
           EOF
 
+          # Ensure we're in the root directory
+          cd $GITHUB_WORKSPACE
+          echo "Current directory before scp: $(pwd)"
+          echo "Checking for build directory before scp:"
+          ls -la app/client/build || echo "build directory missing"
           scp -i /home/runner/key.pem -r ./app/client/build ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/client/build
           scp -i /home/runner/key.pem ./app/server/package.json ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
           scp -i /home/runner/key.pem ./app/server/server.js ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
