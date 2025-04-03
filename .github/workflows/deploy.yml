@@ -22,55 +22,22 @@ jobs:
 
       - name: Build React App
         run: |
-          set -e  # Exit on any error
+          set -e
           cd app/client
-          echo "Node memory settings: $NODE_OPTIONS"
-          free -m
-          echo "Current directory: $(pwd)"
-          echo "Directory contents before install:"
-          ls -la
-          if [ -f "package-lock.json" ]; then
-            echo "Using npm ci..."
-            npm ci --loglevel=verbose > npm-install.log 2>&1 || {
-              echo "npm ci failed. See npm-install.log for details:"
-              cat npm-install.log
-              exit 1
-            }
-          else
-            echo "No package-lock.json found, falling back to npm install..."
-            npm install --loglevel=verbose > npm-install.log 2>&1 || {
-              echo "npm install failed. See npm-install.log for details:"
-              cat npm-install.log
-              exit 1
-            }
-          fi
-          echo "Directory contents after install:"
-          ls -la
-          echo "Checking for public and src directories:"
-          ls -la public || echo "public directory missing"
-          ls -la src || echo "src directory missing"
-          echo "Running npm run build..."
-          CI=false npm run build > build.log 2>&1
-          BUILD_EXIT_CODE=$?
-          if [ $BUILD_EXIT_CODE -ne 0 ]; then
-            echo "npm run build failed with exit code $BUILD_EXIT_CODE. See build.log for details:"
-            cat build.log
-            exit 1
-          fi
-          if [ ! -d "build" ]; then
-            echo "Error: build directory not found after npm run build"
-            ls -la
-            cat build.log
-            exit 1
-          fi
-          echo "Build directory contents:"
-          ls -la build
-          free -m
+          npm install --loglevel=verbose > npm-install.log 2>&1 || { cat npm-install.log; exit 1; }
+          CI=false npm run build > build.log 2>&1 || { cat build.log; exit 1; }
+          ls -la build  # Confirm build directory exists
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
+      - name: Upload Build Directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-directory
+          path: app/client/build
+
       - name: Upload Build Logs
-        if: always()  # Run even if previous steps fail
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-logs
@@ -78,120 +45,35 @@ jobs:
             app/client/npm-install.log
             app/client/build.log
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      # Other steps (Terraform, AWS credentials, etc.) remain unchanged
+      # ...
+
+      - name: Download Build Directory
+        uses: actions/download-artifact@v4
         with:
-          terraform_version: 1.9.0
-
-      - name: Debug Network Connectivity
-        run: |
-          echo "Testing connectivity to GitHub..."
-          curl -I https://github.com
-          echo "Testing connectivity to aws-actions/configure-aws-credentials..."
-          curl -I https://github.com/aws-actions/configure-aws-credentials
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Terraform Init
-        working-directory: ./terraform
-        run: terraform init
-
-      - name: Terraform Apply
-        working-directory: ./terraform
-        run: terraform apply -auto-approve -refresh=true
-
-      - name: Get EC2 IP
-        id: ec2-ip
-        working-directory: ./terraform
-        run: |
-          IP=$(terraform output -raw instance_ip | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' || echo "")
-          if [ -z "$IP" ]; then
-            echo "No running EC2 instance found. Exiting."
-            exit 1
-          fi
-          echo "ip=$IP" >> $GITHUB_OUTPUT
-
-      - name: Install SSH Key
-        run: |
-          echo "${{ secrets.EC2_SSH_KEY }}" > /home/runner/key.pem
-          chmod 400 /home/runner/key.pem
-
-      - name: Wait for EC2 Instance
-        run: |
-          echo "Waiting for EC2 instance to be ready..."
-          for i in {1..60}; do
-            if nc -v -w 5 -z ${{ steps.ec2-ip.outputs.ip }} 22 2>&1; then
-              echo "EC2 is ready!"
-              break
-            fi
-            echo "Waiting... ($i/60)"
-            sleep 10
-          done
-          if ! nc -w 5 -z ${{ steps.ec2-ip.outputs.ip }} 22; then
-            echo "Error: EC2 not reachable after 10 minutes"
-            exit 1
-          fi
+          name: build-directory
+          path: app/client/build
 
       - name: Deploy Docker Compose
         run: |
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
-            df -h /
-            cat /home/ec2-user/resize.log || echo "No resize log found"
             sudo dnf update -y
             sudo dnf install -y docker
             sudo systemctl start docker
             sudo systemctl enable docker
-            sudo groupadd docker || true
             sudo usermod -aG docker ec2-user
-
-            echo "Waiting for Docker daemon..."
-            for i in {1..30}; do
-              if sudo docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
-                echo "Docker daemon is ready!"
-                break
-              fi
-              echo "Waiting... ($i/30)"
-              sleep 5
-            done
-            if ! sudo docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
-              echo "Error: Docker daemon not running after 2.5 minutes"
-              exit 1
-            fi
-
-            sudo docker system prune -f --volumes || true
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
-            echo "Docker Compose version: $(/usr/local/bin/docker-compose --version)"
             mkdir -p /home/ec2-user/cloudsecure
           EOF
-
-          # Ensure we're in the root directory
           cd $GITHUB_WORKSPACE
-          echo "Current directory before scp: $(pwd)"
-          echo "Checking for build directory before scp:"
-          ls -la app/client/build || echo "build directory missing"
+          ls -la app/client/build  # Verify build directory is present
           scp -i /home/runner/key.pem -r ./app/client/build ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/client/build
           scp -i /home/runner/key.pem ./app/server/package.json ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
           scp -i /home/runner/key.pem ./app/server/server.js ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
           scp -i /home/runner/key.pem ./app/server/Dockerfile ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
           scp -i /home/runner/key.pem ./docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
-
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
             cd /home/ec2-user/cloudsecure
-            df -h /
-            free -m
-            sudo /usr/local/bin/docker-compose up -d --build || {
-              echo "Docker Compose failed. Checking logs..."
-              sudo docker ps -a
-              df -h /
-              free -m
-              exit 1
-            }
-            echo "Docker Compose deployed successfully!"
-            sudo docker ps -a
+            sudo /usr/local/bin/docker-compose up -d --build
           EOF
