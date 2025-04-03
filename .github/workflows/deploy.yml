@@ -3,7 +3,7 @@ name: Deploy CloudSecure to AWS EC2
 on:
   push:
     branches:
-      - main
+      - cicd-v2
 
 jobs:
   deploy:
@@ -83,9 +83,11 @@ jobs:
           curl -I https://github.com
           echo "Testing connectivity to aws-actions/configure-aws-credentials..."
           curl -I https://github.com/aws-actions/configure-aws-credentials
+          echo "Testing specific commit SHA..."
+          curl -I https://github.com/aws-actions/configure-aws-credentials/commit/e4d7671e4b643b5e8e85c7c516e2e3d0a9a6a5e
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e4d7671e4b643b5e8e85c7c516e2e3d0a9a6a5e  # Specific commit SHA for v4
+        uses: aws-actions/configure-aws-credentials@v3  # Fallback to v3
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
