@@ -3,7 +3,7 @@ name: Deploy CloudSecure to AWS EC2
 on:
   push:
     branches:
-      - cicd-v2
+      - main
 
 jobs:
   deploy:
@@ -46,15 +46,21 @@ jobs:
           fi
           echo "Directory contents after install:"
           ls -la
+          echo "Checking for public and src directories:"
+          ls -la public || echo "public directory missing"
+          ls -la src || echo "src directory missing"
           echo "Running npm run build..."
-          CI=false npm run build > build.log 2>&1 || {
-            echo "npm run build failed. See build.log for details:"
+          CI=false npm run build > build.log 2>&1
+          BUILD_EXIT_CODE=$?
+          if [ $BUILD_EXIT_CODE -ne 0 ]; then
+            echo "npm run build failed with exit code $BUILD_EXIT_CODE. See build.log for details:"
             cat build.log
             exit 1
-          }
+          fi
           if [ ! -d "build" ]; then
             echo "Error: build directory not found after npm run build"
             ls -la
+            cat build.log
             exit 1
           fi
           echo "Build directory contents:"
@@ -83,11 +89,9 @@ jobs:
           curl -I https://github.com
           echo "Testing connectivity to aws-actions/configure-aws-credentials..."
           curl -I https://github.com/aws-actions/configure-aws-credentials
-          echo "Testing specific commit SHA..."
-          curl -I https://github.com/aws-actions/configure-aws-credentials/commit/e4d7671e4b643b5e8e85c7c516e2e3d0a9a6a5e
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v3  # Fallback to v3
+        uses: aws-actions/configure-aws-credentials@v3
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
