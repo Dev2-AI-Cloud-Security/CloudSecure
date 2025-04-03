@@ -3,7 +3,7 @@ name: Deploy CloudSecure to AWS EC2
 on:
   push:
     branches:
-      - main
+      - cicd-v2
 
 jobs:
   deploy:
