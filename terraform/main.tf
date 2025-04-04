@@ -8,17 +8,41 @@ data "aws_vpc" "default" {
   default = true
 }
 
-# Fetch the default subnet in the default VPC
-data "aws_subnet" "default" {
-  vpc_id            = data.aws_vpc.default.id
-  availability_zone = "us-east-2a" # Adjust if needed
-  default_for_az    = true
+# Fetch available subnets in the default VPC
+data "aws_subnets" "available" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
 }
 
-# Reference the existing security group
-data "aws_security_group" "cloudsecure_sg" {
-  name   = "cloudsecure-sg"
-  vpc_id = data.aws_vpc.default.id
+data "aws_subnet" "default" {
+  id = element(data.aws_subnets.available.ids, 0) # Use the first available subnet
+}
+
+# Create the security group
+resource "aws_security_group" "cloudsecure_sg" {
+  name        = "cloudsecure-sg"
+  description = "Security group for CloudSecure EC2 instance"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Restrict this in production
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "cloudsecure-sg"
+  }
 }
 
 # Fetch the latest Amazon Linux 2023 AMI
@@ -37,18 +61,17 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
-# Create EC2 instance with a unique tag to force recreation
+# Create EC2 instance
 resource "aws_instance" "cloudsecure" {
   ami           = data.aws_ami.amazon_linux_2023.id
   instance_type = "t2.micro"
-  key_name      = "cloudsecure-key"
+  key_name      = "cloudsecure-key" # Ensure this exists in AWS
 
   subnet_id              = data.aws_subnet.default.id
-  vpc_security_group_ids = [data.aws_security_group.cloudsecure_sg.id]
+  vpc_security_group_ids = [aws_security_group.cloudsecure_sg.id]
 
-  # Set root volume to 10 GiB
   root_block_device {
-    volume_size           = 10 # GiB
+    volume_size           = 10
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -60,18 +83,16 @@ resource "aws_instance" "cloudsecure" {
               systemctl start docker
               systemctl enable docker
               usermod -aG docker ec2-user
-              # Resize partition and filesystem
               echo "Resizing partition..." > /home/ec2-user/resize.log 2>&1
               growpart /dev/xvda 1 >> /home/ec2-user/resize.log 2>&1 || echo "growpart failed" >> /home/ec2-user/resize.log
               echo "Resizing filesystem..." >> /home/ec2-user/resize.log 2>&1
               xfs_growfs / >> /home/ec2-user/resize.log 2>&1 || echo "xfs_growfs failed" >> /home/ec2-user/resize.log
               df -h / >> /home/ec2-user/resize.log 2>&1
-              # Ensure the log is readable
               chmod 644 /home/ec2-user/resize.log
               EOF
 
   tags = {
-    Name = "cloudsecure-instance-${timestamp()}" # Unique tag to force recreation
+    Name = "cloudsecure-instance-${timestamp()}"
   }
 
   lifecycle {
