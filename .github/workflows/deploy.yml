@@ -161,7 +161,7 @@ jobs:
 
             # Add ec2-user to docker group and apply group changes
             sudo usermod -aG docker ec2-user
-            newgrp docker || true  # Apply group changes in the current session
+            newgrp docker || true
 
             # Verify ec2-user can access Docker without sudo
             for i in {1..5}; do
