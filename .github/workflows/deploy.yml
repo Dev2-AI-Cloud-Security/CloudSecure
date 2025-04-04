@@ -24,7 +24,6 @@ jobs:
       - name: Install Dependencies and Build
         run: |
           npm install
-          npm run build  # Adjust if your app has a build step
         env:
           NODE_OPTIONS: --max-old-space-size=4096
       # Set up Terraform
