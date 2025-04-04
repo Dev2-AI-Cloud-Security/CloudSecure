@@ -140,13 +140,53 @@ jobs:
               echo "Cannot determine OS" && exit 1
             fi
 
-            sudo systemctl start docker && sudo systemctl enable docker
+            # Start and enable Docker
+            sudo systemctl start docker
+            sudo systemctl enable docker
+
+            # Verify Docker daemon is running
+            for i in {1..5}; do
+              if sudo docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
+                echo "Docker daemon is running."
+                break
+              fi
+              echo "Waiting for Docker daemon to start... ($i/5)"
+              sleep 5
+            done
+            if ! sudo docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
+              echo "Error: Docker daemon failed to start."
+              sudo systemctl status docker
+              exit 1
+            fi
+
+            # Add ec2-user to docker group and apply group changes
             sudo usermod -aG docker ec2-user
+            newgrp docker || true  # Apply group changes in the current session
+
+            # Verify ec2-user can access Docker without sudo
+            for i in {1..5}; do
+              if docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
+                echo "ec2-user can access Docker daemon."
+                break
+              fi
+              echo "Waiting for group changes to apply... ($i/5)"
+              sleep 5
+            done
+            if ! docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
+              echo "Warning: ec2-user cannot access Docker daemon without sudo. Using sudo for Docker commands."
+              USE_SUDO="sudo"
+            else
+              USE_SUDO=""
+            fi
+
+            # Install Docker Compose
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
+            echo "Docker Compose version: $(docker-compose --version)"
 
+            # Run Docker Compose
             cd /home/ec2-user/cloudsecure
             export NODE_OPTIONS='--max-old-space-size=4096'
-            docker-compose down --remove-orphans
-            docker-compose up --build -d
+            $USE_SUDO docker-compose down --remove-orphans
+            $USE_SUDO docker-compose up --build -d
           EOF
