@@ -22,11 +22,15 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Install Dependencies and Build
+      # Build the client in GitHub Actions
+      - name: Build Client
+        working-directory: ./app/client
         run: |
           npm install
+          npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          GENERATE_SOURCEMAP: false
 
       # Set up Terraform
       - name: Setup Terraform
@@ -109,10 +113,11 @@ jobs:
             exit 1
           fi
 
-      # Build and Deploy Docker Containers
+      # Deploy Docker Containers
       - name: Deploy Docker Compose
         run: |
-          scp -i /home/runner/key.pem -r ./app docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
+          # Copy the pre-built client build folder, server code, and docker-compose.yml
+          scp -i /home/runner/key.pem -r ./app/client/build ./app/server docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
             # Debug OS
             cat /etc/os-release || echo "OS info unavailable"
@@ -186,7 +191,6 @@ jobs:
 
             # Run Docker Compose
             cd /home/ec2-user/cloudsecure
-            export NODE_OPTIONS='--max-old-space-size=4096'
             $USE_SUDO docker-compose down --remove-orphans
-            $USE_SUDO docker-compose up --build -d
+            $USE_SUDO docker-compose up -d
           EOF

@@ -45,14 +45,14 @@ data "aws_ami" "amazon_linux_2023" {
 # Create EC2 instance
 resource "aws_instance" "cloudsecure" {
   ami                         = data.aws_ami.amazon_linux_2023.id
-  instance_type               = "t2.micro"
+  instance_type               = "t2.micro" # Free Tier eligible
   key_name                    = "cloudsecure-key"
   subnet_id                   = data.aws_subnet.default.id
   vpc_security_group_ids      = [data.aws_security_group.cloudsecure_sg.id]
   associate_public_ip_address = true
 
   root_block_device {
-    volume_size           = 10
+    volume_size           = 10 # Within Free Tier (30 GB total)
     volume_type           = "gp3"
     delete_on_termination = true
   }
