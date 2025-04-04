@@ -20,29 +20,30 @@ data "aws_subnet" "default" {
   id = element(data.aws_subnets.available.ids, 0) # Use the first available subnet
 }
 
-# Create the security group
-resource "aws_security_group" "cloudsecure_sg" {
-  name        = "cloudsecure-sg"
-  description = "Security group for CloudSecure EC2 instance"
-  vpc_id      = data.aws_vpc.default.id
+# Fetch the existing security group
+data "aws_security_group" "cloudsecure_sg" {
+  name   = "cloudsecure-sg"
+  vpc_id = data.aws_vpc.default.id
+}
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Restrict this in production
-  }
+# Add inbound SSH rule to the existing security group (if needed)
+resource "aws_security_group_rule" "ssh_ingress" {
+  type              = "ingress"
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"] # Restrict in production
+  security_group_id = data.aws_security_group.cloudsecure_sg.id
+}
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "cloudsecure-sg"
-  }
+# Add egress rule (if needed)
+resource "aws_security_group_rule" "egress" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = data.aws_security_group.cloudsecure_sg.id
 }
 
 # Fetch the latest Amazon Linux 2023 AMI
@@ -67,7 +68,7 @@ resource "aws_instance" "cloudsecure" {
   instance_type               = "t2.micro"
   key_name                    = "cloudsecure-key" # Matches your AWS key pair
   subnet_id                   = data.aws_subnet.default.id
-  vpc_security_group_ids      = [aws_security_group.cloudsecure_sg.id]
+  vpc_security_group_ids      = [data.aws_security_group.cloudsecure_sg.id]
   associate_public_ip_address = true # Ensure the instance gets a public IP
 
   root_block_device {
