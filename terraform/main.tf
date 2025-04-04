@@ -63,12 +63,12 @@ data "aws_ami" "amazon_linux_2023" {
 
 # Create EC2 instance
 resource "aws_instance" "cloudsecure" {
-  ami           = data.aws_ami.amazon_linux_2023.id
-  instance_type = "t2.micro"
-  key_name      = "cloudsecure-key" # Ensure this exists in AWS
-
-  subnet_id              = data.aws_subnet.default.id
-  vpc_security_group_ids = [aws_security_group.cloudsecure_sg.id]
+  ami                         = data.aws_ami.amazon_linux_2023.id
+  instance_type               = "t2.micro"
+  key_name                    = "cloudsecure-key" # Matches your AWS key pair
+  subnet_id                   = data.aws_subnet.default.id
+  vpc_security_group_ids      = [aws_security_group.cloudsecure_sg.id]
+  associate_public_ip_address = true # Ensure the instance gets a public IP
 
   root_block_device {
     volume_size           = 10
@@ -83,6 +83,9 @@ resource "aws_instance" "cloudsecure" {
               systemctl start docker
               systemctl enable docker
               usermod -aG docker ec2-user
+              # Ensure SSH daemon is running
+              systemctl start sshd
+              systemctl enable sshd
               echo "Resizing partition..." > /home/ec2-user/resize.log 2>&1
               growpart /dev/xvda 1 >> /home/ec2-user/resize.log 2>&1 || echo "growpart failed" >> /home/ec2-user/resize.log
               echo "Resizing filesystem..." >> /home/ec2-user/resize.log 2>&1
