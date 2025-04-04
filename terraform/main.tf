@@ -1,6 +1,6 @@
 # Configure the AWS provider
 provider "aws" {
-  region = "us-east-1"
+  region = "us-east-2"
 }
 
 # Fetch the default VPC
@@ -11,7 +11,7 @@ data "aws_vpc" "default" {
 # Fetch the default subnet in the default VPC
 data "aws_subnet" "default" {
   vpc_id            = data.aws_vpc.default.id
-  availability_zone = "us-east-1a" # Adjust if needed
+  availability_zone = "us-east-2" # Adjust if needed
   default_for_az    = true
 }
 
