@@ -26,26 +26,6 @@ data "aws_security_group" "cloudsecure_sg" {
   vpc_id = data.aws_vpc.default.id
 }
 
-# Add inbound SSH rule to the existing security group (if needed)
-resource "aws_security_group_rule" "ssh_ingress" {
-  type              = "ingress"
-  from_port         = 22
-  to_port           = 22
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"] # Restrict in production
-  security_group_id = data.aws_security_group.cloudsecure_sg.id
-}
-
-# Add egress rule (if needed)
-resource "aws_security_group_rule" "egress" {
-  type              = "egress"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = data.aws_security_group.cloudsecure_sg.id
-}
-
 # Fetch the latest Amazon Linux 2023 AMI
 data "aws_ami" "amazon_linux_2023" {
   most_recent = true
