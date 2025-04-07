@@ -25,6 +25,7 @@ services:
 
   mongo-service:
     image: mongo:latest
+    platform: linux/amd64
     container_name: mongo-service
     environment:
       MONGO_INITDB_ROOT_USERNAME: mongo-user
