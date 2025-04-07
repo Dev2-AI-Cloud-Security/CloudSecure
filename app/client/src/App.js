@@ -18,6 +18,7 @@ const TerraformForm = lazy(() => import('./components/TerraformPage'));
 const LandingPage = lazy(() => import('./components/LandingPage'));
 const ThreatMonitoring = lazy(() => import('./components/ThreatMain.js'));
 const UserManagement = lazy(() => import('./components/UserManagement/layout.js'));
+const LoginPage = lazy(() => import('./components/LoginPage'));
 
 const NAVIGATION = [
   {
@@ -78,6 +79,9 @@ function DemoPageContent({ pathname }) {
       break;
     case '/infra':
       Component = TerraformForm;
+      break;
+    case '/login':
+      Component = LoginPage;
       break;
     default:
       Component = () => (
