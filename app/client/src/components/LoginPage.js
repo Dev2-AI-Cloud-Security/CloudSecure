@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import Link from '@mui/material/Link';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../config/api';
 import "./LoginPage.css";
 
 function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmitLogin = async (e) => {
     e.preventDefault();
@@ -14,7 +15,7 @@ function LoginPage() {
       if (response && response.token) {
         localStorage.setItem('token', response.token);
         alert('Logged in successfully. Redirecting to landing page');
-        window.location.href = '/landing';
+        navigate('/app');
       }
     } catch (error) {
       alert(error.message || 'Login failed. Please try again.');
