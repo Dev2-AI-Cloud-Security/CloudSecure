@@ -1,9 +1,6 @@
 services:
   client:
-    build:
-      context: ./app/client
-      dockerfile: Dockerfile
-    container_name: cloudsecure-client
+    image: cvcharanraj/cloudsecure-client
     environment:
       - REACT_APP_API_URL=http://cloudsecure-server:3000
       - NODE_ENV=development
@@ -16,10 +13,7 @@ services:
       - app-network
 
   server:
-    build:
-      context: ./app/server
-      dockerfile: Dockerfile
-    container_name: cloudsecure-server
+    image: cvcharanraj/cloudsecure-server
     ports:
       - "3000:3000"
     depends_on:
