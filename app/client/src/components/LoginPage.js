@@ -15,7 +15,7 @@ function LoginPage() {
       if (response && response.token) {
         localStorage.setItem('token', response.token);
         alert('Logged in successfully. Redirecting to landing page');
-        navigate('/LandingPage');
+        navigate('/app');
       }
     } catch (error) {
       alert(error.message || 'Login failed. Please try again.');
