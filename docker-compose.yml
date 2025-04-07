@@ -1,9 +1,7 @@
 services:
   client:
-    build:
-      context: ./app/client
-      dockerfile: Dockerfile
-    container_name: cloudsecure-client
+    image: cvcharanraj/cloudsecure-client
+    platform: linux/amd64
     environment:
       - REACT_APP_API_URL=http://cloudsecure-server:3000
       - NODE_ENV=development
@@ -16,10 +14,8 @@ services:
       - app-network
 
   server:
-    build:
-      context: ./app/server
-      dockerfile: Dockerfile
-    container_name: cloudsecure-server
+    image: cvcharanraj/cloudsecure-server
+    platform: linux/amd64
     ports:
       - "3000:3000"
     depends_on:
@@ -31,6 +27,7 @@ services:
 
   mongo-service:
     image: mongo:latest
+    platform: linux/amd64
     container_name: mongo-service
     environment:
       MONGO_INITDB_ROOT_USERNAME: mongo-user
@@ -46,6 +43,7 @@ services:
 
   redis-service:
     image: redis:latest
+    platform: linux/amd64
     container_name: redis-service
     ports:
       - "6379:6379"

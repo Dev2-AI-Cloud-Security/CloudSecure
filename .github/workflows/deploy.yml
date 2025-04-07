@@ -3,118 +3,101 @@ name: Deploy CloudSecure to AWS EC2
 on:
   push:
     branches:
-      - main
+      - release
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout the repository
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Set up Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
+          NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Build React App
+      # Build the client in GitHub Actions
+      - name: Build Client
+        working-directory: ./app/client
         run: |
-          set -e  # Exit on any error
-          cd app/client
-          echo "Node memory settings: $NODE_OPTIONS"
-          free -m
-          echo "Current directory: $(pwd)"
-          echo "Directory contents before install:"
-          ls -la
-          if [ -f "package-lock.json" ]; then
-            echo "Using npm ci..."
-            npm ci --loglevel=verbose > npm-install.log 2>&1 || {
-              echo "npm ci failed. See npm-install.log for details:"
-              cat npm-install.log
-              exit 1
-            }
-          else
-            echo "No package-lock.json found, falling back to npm install..."
-            npm install --loglevel=verbose > npm-install.log 2>&1 || {
-              echo "npm install failed. See npm-install.log for details:"
-              cat npm-install.log
-              exit 1
-            }
-          fi
-          echo "Directory contents after install:"
-          ls -la
-          echo "Running npm run build..."
-          CI=false npm run build > build.log 2>&1 || {
-            echo "npm run build failed. See build.log for details:"
-            cat build.log
-            exit 1
-          }
-          if [ ! -d "build" ]; then
-            echo "Error: build directory not found after npm run build"
-            ls -la
-            exit 1
-          fi
-          echo "Build directory contents:"
-          ls -la build
-          free -m
+          npm install
+          npm run build
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
+          NODE_OPTIONS: --max-old-space-size=4096
+          GENERATE_SOURCEMAP: false
+          DISABLE_ESLINT_PLUGIN: true # Disable ESLint during build
 
-      - name: Upload Build Logs
-        if: always()  # Run even if previous steps fail
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: |
-            app/client/npm-install.log
-            app/client/build.log
-
+      # Set up Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.9.0
 
-      - name: Debug Network Connectivity
-        run: |
-          echo "Testing connectivity to GitHub..."
-          curl -I https://github.com
-          echo "Testing connectivity to aws-actions/configure-aws-credentials..."
-          curl -I https://github.com/aws-actions/configure-aws-credentials
-
+      # Configure AWS Credentials
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e4d7671e4b643b5e8e85c7c516e2e3d0a9a6a5e  # Specific commit SHA for v4
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: us-east-2
 
+      # Initialize Terraform
       - name: Terraform Init
         working-directory: ./terraform
         run: terraform init
 
+      # Apply Terraform (create or update EC2)
       - name: Terraform Apply
         working-directory: ./terraform
-        run: terraform apply -auto-approve -refresh=true
+        run: |
+          terraform apply -auto-approve
+          IP=$(terraform output -raw instance_ip | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' || echo "")
+          if [ -z "$IP" ]; then
+            echo "No running EC2 instance found and none created. Exiting."
+            exit 1
+          fi
+          echo "EC2 IP: $IP"
 
+      # Get EC2 instance IP
       - name: Get EC2 IP
         id: ec2-ip
         working-directory: ./terraform
         run: |
           IP=$(terraform output -raw instance_ip | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' || echo "")
           if [ -z "$IP" ]; then
-            echo "No running EC2 instance found. Exiting."
+            echo "No running EC2 instance found and none created. Exiting."
             exit 1
           fi
           echo "ip=$IP" >> $GITHUB_OUTPUT
 
+      # Install SSH key for EC2 access
       - name: Install SSH Key
         run: |
+          if [ -z "${{ secrets.EC2_SSH_KEY }}" ]; then
+            echo "Error: EC2_SSH_KEY secret is not set"
+            exit 1
+          fi
           echo "${{ secrets.EC2_SSH_KEY }}" > /home/runner/key.pem
           chmod 400 /home/runner/key.pem
 
+      # Debug SSH Key and Connection
+      - name: Debug SSH Connection
+        run: |
+          echo "Verifying SSH key and connection..."
+          ssh-keygen -y -f /home/runner/key.pem > /dev/null || (echo "Invalid SSH key format" && exit 1)
+          for i in {1..10}; do
+            ssh -vvv -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} "echo 'SSH successful'" && break
+            echo "Attempt $i failed. Retrying in 15 seconds..."
+            sleep 15
+          done || (echo "SSH connection failed after 10 attempts" && exit 1)
+
+      # Wait for EC2 to be ready
       - name: Wait for EC2 Instance
         run: |
           echo "Waiting for EC2 instance to be ready..."
@@ -131,56 +114,84 @@ jobs:
             exit 1
           fi
 
+      # Deploy Docker Containers
       - name: Deploy Docker Compose
         run: |
+          # Copy the pre-built client build folder, server code, and docker-compose.yml
+          scp -i /home/runner/key.pem -r ./app/client/build ./app/server docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
-            df -h /
-            cat /home/ec2-user/resize.log || echo "No resize log found"
-            sudo dnf update -y
-            sudo dnf install -y docker
+            # Debug OS
+            cat /etc/os-release || echo "OS info unavailable"
+            echo "User: $(whoami)"
+
+            # Install Docker
+            if [[ -f /etc/os-release ]]; then
+              . /etc/os-release
+              case $ID in
+                amzn)
+                  if [[ $VERSION_ID =~ ^2 ]]; then
+                    sudo yum update -y && sudo amazon-linux-extras install docker -y
+                  else
+                    sudo dnf update -y && sudo dnf install -y docker
+                  fi
+                  ;;
+                ubuntu)
+                  sudo apt-get update -y && sudo apt-get install -y docker.io
+                  ;;
+                *)
+                  echo "Unsupported OS: $ID" && exit 1
+                  ;;
+              esac
+            else
+              echo "Cannot determine OS" && exit 1
+            fi
+
+            # Start and enable Docker
             sudo systemctl start docker
             sudo systemctl enable docker
-            sudo groupadd docker || true
-            sudo usermod -aG docker ec2-user
 
-            echo "Waiting for Docker daemon..."
-            for i in {1..30}; do
+            # Verify Docker daemon is running
+            for i in {1..5}; do
               if sudo docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
-                echo "Docker daemon is ready!"
+                echo "Docker daemon is running."
                 break
               fi
-              echo "Waiting... ($i/30)"
+              echo "Waiting for Docker daemon to start... ($i/5)"
               sleep 5
             done
             if ! sudo docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
-              echo "Error: Docker daemon not running after 2.5 minutes"
+              echo "Error: Docker daemon failed to start."
+              sudo systemctl status docker
               exit 1
             fi
 
-            sudo docker system prune -f --volumes || true
+            # Add ec2-user to docker group and apply group changes
+            sudo usermod -aG docker ec2-user
+            newgrp docker || true
+
+            # Verify ec2-user can access Docker without sudo
+            for i in {1..5}; do
+              if docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
+                echo "ec2-user can access Docker daemon."
+                break
+              fi
+              echo "Waiting for group changes to apply... ($i/5)"
+              sleep 5
+            done
+            if ! docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
+              echo "Warning: ec2-user cannot access Docker daemon without sudo. Using sudo for Docker commands."
+              USE_SUDO="sudo"
+            else
+              USE_SUDO=""
+            fi
+
+            # Install Docker Compose
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
-            echo "Docker Compose version: $(/usr/local/bin/docker-compose --version)"
-            mkdir -p /home/ec2-user/cloudsecure
-          EOF
+            echo "Docker Compose version: $(docker-compose --version)"
 
-          scp -i /home/runner/key.pem -r ./app/client/build ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/client/build
-          scp -i /home/runner/key.pem ./app/server/package.json ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
-          scp -i /home/runner/key.pem ./app/server/server.js ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
-          scp -i /home/runner/key.pem ./app/server/Dockerfile ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/app/server/
-          scp -i /home/runner/key.pem ./docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
-
-          ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
+            # Run Docker Compose
             cd /home/ec2-user/cloudsecure
-            df -h /
-            free -m
-            sudo /usr/local/bin/docker-compose up -d --build || {
-              echo "Docker Compose failed. Checking logs..."
-              sudo docker ps -a
-              df -h /
-              free -m
-              exit 1
-            }
-            echo "Docker Compose deployed successfully!"
-            sudo docker ps -a
+            $USE_SUDO docker-compose down --remove-orphans
+            $USE_SUDO docker-compose up -d
           EOF

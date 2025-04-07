@@ -1,6 +1,6 @@
 # Configure the AWS provider
 provider "aws" {
-  region = "us-east-1"
+  region = "us-east-2"
 }
 
 # Fetch the default VPC
@@ -8,14 +8,19 @@ data "aws_vpc" "default" {
   default = true
 }
 
-# Fetch the default subnet in the default VPC
-data "aws_subnet" "default" {
-  vpc_id            = data.aws_vpc.default.id
-  availability_zone = "us-east-1a" # Adjust if needed
-  default_for_az    = true
+# Fetch available subnets in the default VPC
+data "aws_subnets" "available" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
 }
 
-# Reference the existing security group
+data "aws_subnet" "default" {
+  id = element(data.aws_subnets.available.ids, 0) # Use the first available subnet
+}
+
+# Fetch the existing security group
 data "aws_security_group" "cloudsecure_sg" {
   name   = "cloudsecure-sg"
   vpc_id = data.aws_vpc.default.id
@@ -37,18 +42,17 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
-# Create EC2 instance with a unique tag to force recreation
+# Create EC2 instance
 resource "aws_instance" "cloudsecure" {
-  ami           = data.aws_ami.amazon_linux_2023.id
-  instance_type = "t2.micro"
-  key_name      = "cloudsecure-key"
+  ami                         = data.aws_ami.amazon_linux_2023.id
+  instance_type               = "t2.micro" # Free Tier eligible
+  key_name                    = "cloudsecure-key"
+  subnet_id                   = data.aws_subnet.default.id
+  vpc_security_group_ids      = [data.aws_security_group.cloudsecure_sg.id]
+  associate_public_ip_address = true
 
-  subnet_id              = data.aws_subnet.default.id
-  vpc_security_group_ids = [data.aws_security_group.cloudsecure_sg.id]
-
-  # Set root volume to 10 GiB
   root_block_device {
-    volume_size           = 10 # GiB
+    volume_size           = 10 # Within Free Tier (30 GB total)
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -60,18 +64,18 @@ resource "aws_instance" "cloudsecure" {
               systemctl start docker
               systemctl enable docker
               usermod -aG docker ec2-user
-              # Resize partition and filesystem
+              systemctl start sshd
+              systemctl enable sshd
               echo "Resizing partition..." > /home/ec2-user/resize.log 2>&1
               growpart /dev/xvda 1 >> /home/ec2-user/resize.log 2>&1 || echo "growpart failed" >> /home/ec2-user/resize.log
               echo "Resizing filesystem..." >> /home/ec2-user/resize.log 2>&1
               xfs_growfs / >> /home/ec2-user/resize.log 2>&1 || echo "xfs_growfs failed" >> /home/ec2-user/resize.log
               df -h / >> /home/ec2-user/resize.log 2>&1
-              # Ensure the log is readable
               chmod 644 /home/ec2-user/resize.log
               EOF
 
   tags = {
-    Name = "cloudsecure-instance-${timestamp()}" # Unique tag to force recreation
+    Name = "cloudsecure-instance-${timestamp()}"
   }
 
   lifecycle {
