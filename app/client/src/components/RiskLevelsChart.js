@@ -1,15 +1,8 @@
-// src/components/Charts/RiskLevelsChart.js
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-
-const data = [
-  { name: 'Low', value: 400 },
-  { name: 'Medium', value: 300 },
-  { name: 'High', value: 200 },
-];
 
 const COLORS = ['#00C49F', '#FFBB28', '#FF8042'];
 
-const RiskLevelsChart = () => {
+const RiskLevelsChart = ({ data }) => {
   return (
     <ResponsiveContainer width="100%" height={200}>
       <PieChart>

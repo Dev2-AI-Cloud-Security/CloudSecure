@@ -1,27 +1,23 @@
 require('dotenv').config(); // Load .env
 const mongoose = require('mongoose');
-const mysql = require('mysql2');
-
-// MySQL Connection
-const mysqlConnection = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
-});
 
 // MongoDB Connection
 const connectMongoDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    const mongoURI ='mongodb://admin:secret@localhost:27017/cloudsecure?authSource=admin';
+    console.log('Connecting to MongoDB at:', mongoURI); // Debug
+    await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+    });
     console.log('✅ MongoDB Connected Successfully');
   } catch (error) {
-    console.error('❌ MongoDB Connection Error:', error);
+    console.error('❌ MongoDB Connection Error:', error.message);
     process.exit(1);
   }
 };
 
 module.exports = {
-  mysqlConnection,
-  connectMongoDB
+  connectMongoDB,
 };

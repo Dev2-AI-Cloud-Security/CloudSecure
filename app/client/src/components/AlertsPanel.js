@@ -1,37 +1,30 @@
-// src/components/AlertsPanel.js
-import { Card, CardContent, Typography, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography } from '@mui/material';
 
-const alerts = [
-  { id: 1, incident: 'Incident 1', status: 'Ongoing' },
-  { id: 2, incident: 'Incident 2', status: 'Resolved' },
-  { id: 3, incident: 'Incident 3', status: 'Ongoing' },
-];
-
-const AlertsPanel = () => {
+const AlertsPanel = ({ alerts }) => {
   return (
-    <Card sx={{ borderRadius: 2 }}>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Alerts Panel
-        </Typography>
+    <div>
+      <Typography variant="h6" gutterBottom>
+        Alerts Panel
+      </Typography>
+      <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
               <TableCell>Incident</TableCell>
-              <TableCell>Status</TableCell>
+              <TableCell>Details</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {alerts.map((alert) => (
+            {alerts.map(alert => (
               <TableRow key={alert.id}>
-                <TableCell>{alert.incident}</TableCell>
-                <TableCell>{alert.status}</TableCell>
+                <TableCell>{alert.message}</TableCell>
+                <TableCell>{alert.details}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-      </CardContent>
-    </Card>
+      </TableContainer>
+    </div>
   );
 };
 

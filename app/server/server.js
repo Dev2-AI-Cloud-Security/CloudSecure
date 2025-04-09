@@ -1,84 +1,408 @@
-// index.js
 
+require('dotenv').config();
 const express = require('express');
-const bodyParser = require('body-parser');
 const cors = require('cors');
-require('dotenv').config(); // Load environment variables
+const AWS = require('aws-sdk');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const User = require('./models/User');
 
-const { mysqlConnection, connectMongoDB } = require('./db');
-const authController = require('./controllers/authController');
-const { chatBot } = require('./controllers/chatController'); // ✅ NEW: chatbot controller
 
+AWS.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION || 'us-east-1',
+});
 const app = express();
-const port = process.env.PORT || 3001;
+app.use(cors({
+  origin: 'http://localhost:3000', // Explicitly allow the frontend origin
+  credentials: true, // Allow credentials (cookies, authorization headers, etc.)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow these methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
+}));
+app.use(express.json());
 
-// CORS Configuration
-const corsOptions = {
-  origin: true, // Allow all origins in development
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-  exposedHeaders: ['Content-Length', 'X-Requested-With'],
-  credentials: true,
-  optionsSuccessStatus: 200,
-  maxAge: 3600,
+// Configure AWS SDK
+AWS.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION || 'us-east-1',
+});
+
+const cloudwatchlogs = new AWS.CloudWatchLogs();
+
+// MongoDB Connection
+const connectMongoDB = async () => {
+  try {
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://admin:secret@localhost:27017/cloudsecure?authSource=admin';
+    console.log('Connecting to MongoDB at:', mongoURI);
+    await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+    });
+    console.log('✅ MongoDB Connected Successfully');
+  } catch (error) {
+    console.error('❌ MongoDB Connection Error:', error.message);
+    process.exit(1);
+  }
 };
 
-// Middleware
-app.use(cors(corsOptions));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// Create Default User
+const createDefaultUser = async () => {
+  try {
+    const defaultUsername = 'admin';
+    const defaultPassword = '1234';
 
-// Enable pre-flight requests for all routes
-app.options('*', cors(corsOptions));
+    const existingUser = await User.findOne({ username: defaultUsername });
+    if (existingUser) {
+      console.log('Default user "admin" already exists');
+      return;
+    }
 
-// Add headers middleware
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin);
-  res.header('Access-Control-Allow-Credentials', true);
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  next();
-});
-
-// Connect to databases
-connectMongoDB()
-  .then(() => {
-    console.log('✅ Connected to MongoDB');
-
-    // Test MySQL connection
-    mysqlConnection.connect((err) => {
-      if (err) {
-        console.error('❌ MySQL Connection Error:', err);
-        return;
-      }
-      console.log('✅ Connected to MySQL');
+    const newUser = new User({
+      username: defaultUsername,
+      password: defaultPassword,
     });
-  })
-  .catch(err => {
-    console.error('❌ Failed to connect to MongoDB:', err);
-    process.exit(1);
-  });
+    await newUser.save();
+    console.log('Default user "admin" created with password "1234"');
+  } catch (error) {
+    console.error('Error creating default user:', error.message);
+  }
+};
 
-// Basic health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+// Initialize Database and Default User
+const initialize = async () => {
+  await connectMongoDB();
+  await createDefaultUser();
+};
+initialize();
+
+// Create Log Group and Stream for CloudWatch Logs
+const logGroupName = '/aws/waf/security-logs';
+const logStreamName = 'demo-stream';
+
+const setupLogGroupAndStream = async () => {
+  try {
+    await cloudwatchlogs.createLogGroup({ logGroupName }).promise();
+    console.log('Log group created');
+  } catch (error) {
+    if (error.code !== 'ResourceAlreadyExistsException') throw error;
+  }
+
+  try {
+    await cloudwatchlogs.createLogStream({
+      logGroupName,
+      logStreamName,
+    }).promise();
+    console.log('Log stream created');
+  } catch (error) {
+    if (error.code !== 'ResourceAlreadyExistsException') throw error;
+  }
+};
+
+// Generate Dummy WAF Log Data
+const generateDummyLogs = async () => {
+  const actions = ['BLOCK', 'ALLOW'];
+  const rules = ['SQLInjectionRule', 'XSSRule', 'DefaultRule'];
+  const uris = ['/login', '/api/users', '/dashboard', '/submit'];
+  const methods = ['GET', 'POST', 'PUT'];
+
+  const logEvents = [];
+  const now = Date.now();
+  const oneDayInMs = 24 * 60 * 60 * 1000;
+
+  for (let i = 0; i < 100; i++) {
+    const timestamp = now - (i * oneDayInMs) / 100;
+    const logEntry = {
+      timestamp: new Date(timestamp).toISOString(),
+      action: actions[Math.floor(Math.random() * actions.length)],
+      httpRequest: {
+        uri: uris[Math.floor(Math.random() * uris.length)],
+        clientIp: `192.168.1.${Math.floor(Math.random() * 255)}`,
+        method: methods[Math.floor(Math.random() * methods.length)],
+      },
+      terminatingRuleId: rules[Math.floor(Math.random() * rules.length)],
+    };
+
+    logEvents.push({
+      message: JSON.stringify(logEntry),
+      timestamp: timestamp,
+    });
+  }
+
+  logEvents.sort((a, b) => a.timestamp - b.timestamp);
+
+  try {
+    await cloudwatchlogs.putLogEvents({
+      logGroupName,
+      logStreamName,
+      logEvents,
+    }).promise();
+    console.log('Dummy logs sent to CloudWatch');
+  } catch (error) {
+    console.error('Error sending dummy logs:', error);
+  }
+};
+
+// Initialize CloudWatch Logs
+const initializeCloudWatch = async () => {
+  await setupLogGroupAndStream();
+  await generateDummyLogs();
+};
+initializeCloudWatch();
+
+// Middleware to Verify JWT
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+
+  if (!token) {
+    return res.status(401).json({ message: 'Access token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultSecretKey');
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(403).json({ message: 'Invalid or expired token' });
+  }
+};
+
+// Helper function to run a CloudWatch Logs Insights query
+const runInsightsQuery = async (queryString, startTime, endTime) => {
+  const params = {
+    queryString,
+    startTime,
+    endTime,
+    logGroupNames: [logGroupName],
+  };
+
+  try {
+    const queryResponse = await cloudwatchlogs.startQuery(params).promise();
+    const queryId = queryResponse.queryId;
+
+    let results;
+    while (true) {
+      const resultResponse = await cloudwatchlogs.getQueryResults({
+        queryId,
+      }).promise();
+
+      if (resultResponse.status === 'Complete') {
+        results = resultResponse.results;
+        break;
+      } else if (resultResponse.status === 'Failed' || resultResponse.status === 'Cancelled') {
+        throw new Error('Query failed or was cancelled');
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    return results;
+  } catch (error) {
+    console.error('Error running CloudWatch Logs Insights query:', error);
+    throw error;
+  }
+};
+
+// API Endpoints
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (await User.findOne({ username })) {
+      return res.status(400).json({ message: 'Username already exists' });
+    }
+    const newUser = new User({ username, password });
+    await newUser.save();
+    res.status(201).json({ message: 'User created successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error registering user', error: error.message });
+  }
 });
 
-// API routes
-app.post('/register', authController.registerUser);
-app.post('/login', authController.loginUser);
-app.post('/chat', chatBot); // ✅ NEW: OpenAI chatbot route
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error('❌ Error:', err.stack);
-  res.status(500).json({
-    status: 'error',
-    message: err.message || 'Internal Server Error'
-  });
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
+    }
+
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, username: user.username },
+      process.env.JWT_SECRET || 'defaultSecretKey',
+      { expiresIn: '1h', issuer: 'CloudSecure' }
+    );
+
+    res.json({
+      token,
+      user: { id: user._id, username: user.username },
+      message: 'Logged in successfully',
+    });
+  } catch (error) {
+    console.error('Error in loginUser:', error.message);
+    res.status(500).json({ message: 'Error logging in', error: error.message });
+  }
 });
 
-// Start server
-app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
+// Protected Endpoints
+app.get('/api/threats', authenticateToken, async (req, res) => {
+  try {
+    const queryString = `
+      fields @timestamp, action
+      | filter action = 'BLOCK'
+      | stats count(*) as threatCount by bin(1h)
+      | sort @timestamp asc
+    `;
+    const endTime = Math.floor(Date.now() / 1000);
+    const startTime = endTime - 24 * 60 * 60;
+    const results = await runInsightsQuery(queryString, startTime, endTime);
+
+    const threats = results.map(row => {
+      const timestampField = row.find(field => field.field === '@timestamp');
+      const countField = row.find(field => field.field === 'threatCount');
+      return {
+        timestamp: timestampField ? timestampField.value : new Date().toISOString(),
+        count: countField ? parseInt(countField.value) : 0,
+      };
+    });
+    res.json(threats);
+  } catch (error) {
+    console.error('Error fetching threats:', error);
+    res.status(500).json({ error: 'Failed to fetch threats' });
+  }
+});
+
+app.get('/api/resolved-issues', authenticateToken, async (req, res) => {
+  try {
+    const queryString = `
+      fields @timestamp, action
+      | filter action = 'ALLOW'
+      | stats count(*) as resolvedCount by bin(3month)
+      | sort @timestamp asc
+    `;
+    const endTime = Math.floor(Date.now() / 1000);
+    const startTime = endTime - 365 * 24 * 60 * 60;
+    const results = await runInsightsQuery(queryString, startTime, endTime);
+
+    const resolvedIssues = results.map(row => {
+      const timestampField = row.find(field => field.field === '@timestamp');
+      const countField = row.find(field => field.field === 'resolvedCount');
+      return {
+        timestamp: timestampField ? timestampField.value : new Date().toISOString(),
+        count: countField ? parseInt(countField.value) : 0,
+      };
+    });
+    res.json(resolvedIssues);
+  } catch (error) {
+    console.error('Error fetching resolved issues:', error);
+    res.status(500).json({ error: 'Failed to fetch resolved issues' });
+  }
+});
+
+app.get('/api/risk-levels', authenticateToken, async (req, res) => {
+  try {
+    // Rewrite the query without using 'case'
+    const queryString = `
+      fields action, terminatingRuleId
+      | parse terminatingRuleId "SQL*" as isSQL
+      | stats count(*) as riskCount by action, isSQL
+      | sort action asc
+    `;
+    const endTime = Math.floor(Date.now() / 1000);
+    const startTime = endTime - 24 * 60 * 60;
+    const results = await runInsightsQuery(queryString, startTime, endTime);
+
+    // Transform the results into risk levels
+    const riskLevels = results.map(row => {
+      const actionField = row.find(field => field.field === 'action');
+      const isSQLField = row.find(field => field.field === 'isSQL');
+      const countField = row.find(field => field.field === 'riskCount');
+
+      const action = actionField ? actionField.value : 'Unknown';
+      const isSQL = isSQLField ? isSQLField.value : 'false';
+      const count = countField ? parseInt(countField.value) : 0;
+
+      let level = 'Unknown';
+      if (action === 'BLOCK' && isSQL === 'true') {
+        level = 'High';
+      } else if (action === 'BLOCK') {
+        level = 'Medium';
+      } else if (action === 'ALLOW') {
+        level = 'Low';
+      }
+
+      return {
+        level,
+        count,
+      };
+    });
+
+    // Aggregate counts by level
+    const aggregatedRiskLevels = riskLevels.reduce((acc, curr) => {
+      const existing = acc.find(item => item.level === curr.level);
+      if (existing) {
+        existing.count += curr.count;
+      } else {
+        acc.push({ level: curr.level, count: curr.count });
+      }
+      return acc;
+    }, []);
+
+    res.json(aggregatedRiskLevels);
+  } catch (error) {
+    console.error('Error fetching risk levels:', error);
+    res.status(500).json({ error: 'Failed to fetch risk levels' });
+  }
+});
+
+app.get('/api/alerts', authenticateToken, async (req, res) => {
+  try {
+    const queryString = `
+      fields @timestamp, action, terminatingRuleId, httpRequest.uri as uri
+      | filter action in ['BLOCK', 'ALLOW']
+      | stats count(*) as eventCount by action, terminatingRuleId, uri
+      | sort @timestamp desc
+      | limit 10
+    `;
+    const endTime = Math.floor(Date.now() / 1000);
+    const startTime = endTime - 24 * 60 * 60;
+    const results = await runInsightsQuery(queryString, startTime, endTime);
+
+    const alerts = results.map(row => {
+      const actionField = row.find(field => field.field === 'action');
+      const ruleField = row.find(field => field.field === 'terminatingRuleId');
+      const uriField = row.find(field => field.field === 'uri');
+
+      const action = actionField ? actionField.value : 'Unknown';
+      const rule = ruleField ? ruleField.value : 'Unknown';
+      const uri = uriField ? uriField.value : 'Unknown';
+
+      return {
+        incident: `${rule} (${uri})`,
+        status: action === 'BLOCK' ? 'Ongoing' : 'Resolved',
+      };
+    });
+    res.json(alerts);
+  } catch (error) {
+    console.error('Error fetching alerts:', error);
+    res.status(500).json({ error: 'Failed to fetch alerts' });
+  }
+});
+
+// Start Server
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
