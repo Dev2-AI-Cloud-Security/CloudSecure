@@ -1,5 +1,7 @@
 // src/components/TerraformForm.js
 import { useState } from 'react';
+import { saveAs } from 'file-saver';
+
 import {
   Card,
   CardContent,
@@ -15,6 +17,7 @@ import {
   Divider,
   Snackbar,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
@@ -30,6 +33,7 @@ const TerraformForm = () => {
 
   const [terraformConfig, setTerraformConfig] = useState('');
   const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false); // State to track deployment progress
 
   const regions = [
     'us-east-1',
@@ -58,7 +62,7 @@ const TerraformForm = () => {
     setFormData((prev) => ({ ...prev, createS3: e.target.value === 'yes' }));
   };
 
-  const generateTerraformConfig = () => {
+  const generateTerraformConfig = async () => {
     const { region, instanceType, ami, instanceName, s3BucketName, createS3 } = formData;
 
     let config = `
@@ -92,13 +96,44 @@ resource "aws_s3_bucket" "my_bucket" {
 
     setTerraformConfig(config);
     setOpenSnackbar(true);
+    try {
+      const response = await fetch('http://localhost:3001/save-terraform-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ config }),
+      });
+   
+      if (response.ok) {
+        alert('Terraform configuration saved on the server successfully!');
+      } else {
+        alert('Failed to save Terraform configuration on the server.');
+      }
+    } catch (error) {
+      console.error('Error saving Terraform config to server:', error);
+      alert('Error saving Terraform configuration to the server.');
+    }
   };
 
-  const handleDeploy = () => {
-    // This would typically trigger a backend API to run Terraform
-    // For now, we'll just log the configuration
-    console.log('Terraform Configuration to Deploy:\n', terraformConfig);
-    alert('Deployment triggered! Check the console for the Terraform configuration.');
+  const handleDeploy = async () => {
+    setIsDeploying(true);
+    try {
+      const response = await fetch('http://localhost:3001/deploy', {
+        method: 'POST',
+      });
+  
+      if (response.ok) {
+        alert('Terraform deployment completed successfully!');
+      } else {
+        alert('Failed to deploy Terraform configuration.');
+      }
+    } catch (error) {
+      console.error('Error deploying Terraform:', error);
+      alert('An error occurred while deploying Terraform.');
+    } finally {
+      setIsDeploying(false); // Hide progress indicator
+    }
   };
 
   return (
@@ -222,9 +257,25 @@ resource "aws_s3_bucket" "my_bucket" {
                     variant="contained"
                     color="secondary"
                     onClick={handleDeploy}
+                    disabled={isDeploying}
                   >
                     Deploy with Terraform
                   </Button>
+                )}
+                {/* Circular Progress */}
+                {isDeploying && (
+                  <Grid item xs={12}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        mt: 2,
+                      }}
+                    >
+                      <CircularProgress />
+                    </Box>
+                  </Grid>
                 )}
               </Box>
             </Grid>

@@ -13,9 +13,6 @@ import {
 const drawerWidth = 240;
 
 const Layout = ({ children }) => {
-
-
-
   return (
     <Box sx={{ display: 'flex' }}>
       <Box

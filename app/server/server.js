@@ -7,13 +7,15 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
-
+const fs = require('fs');
+const path = require('path');
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   region: process.env.AWS_REGION || 'us-east-1',
 });
+
 const app = express();
 app.use(cors({
   origin: 'http://localhost:3000', // Explicitly allow the frontend origin
@@ -398,6 +400,56 @@ app.get('/api/alerts', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching alerts:', error);
     res.status(500).json({ error: 'Failed to fetch alerts' });
+  }
+});
+
+app.post('/save-terraform-config', (req, res) => {
+  const { config } = req.body;
+
+  if (!config) {
+    return res.status(400).send('No configuration provided.');
+  }
+
+  const filePath = path.join(__dirname, 'terraform-config.tf');
+  fs.writeFile(filePath, config, (err) => {
+    if (err) {
+      console.error('Error saving Terraform config:', err);
+      return res.status(500).send('Failed to save configuration.');
+    }
+    res.send('Terraform configuration saved successfully.');
+  });
+});
+
+
+const { exec } = require('child_process');
+
+// Deploy API to run Terraform
+app.post('/deploy', async (req, res) => {
+  const terraformFilePath = path.join(__dirname, 'terraform-config.tf');
+
+  // Check if the Terraform file exists
+  if (!fs.existsSync(terraformFilePath)) {
+    return res.status(400).send('Terraform configuration file not found.');
+  }
+
+  try {
+    // Run Terraform commands
+    exec(`terraform init && terraform apply -auto-approve`, { cwd: __dirname }, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Error running Terraform:', error.message);
+        return res.status(500).send('Failed to deploy resources.');
+      }
+
+      if (stderr) {
+        console.error('Terraform stderr:', stderr);
+      }
+
+      console.log('Terraform stdout:', stdout);
+      res.send('Terraform deployment completed successfully.');
+    });
+  } catch (error) {
+    console.error('Error deploying Terraform:', error.message);
+    res.status(500).send('An error occurred while deploying resources.');
   }
 });
 
