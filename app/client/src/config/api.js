@@ -1,9 +1,7 @@
-// Use environment variable for the API base URL, with a fallback to localhost
-const API_BASE_URL =  'http://localhost:3001';
 
 // Base configuration for API requests
 export const apiConfig = {
-  baseURL: API_BASE_URL,
+  baseURL: process.env.API_BASE_URL || 'http://localhost:3001',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 // MongoDB Connection
 const connectMongoDB = async () => {
   try {
-    const mongoURI ='mongodb://admin:secret@localhost:27017/cloudsecure?authSource=admin';
+    const mongoURI ='mongodb://'+process.env.DB_USER+":"+process.env.DB_PASSWORD+'@localhost:27017/cloudsecure?authSource=admin';
     console.log('Connecting to MongoDB at:', mongoURI); // Debug
     await mongoose.connect(mongoURI, {
       useNewUrlParser: true,

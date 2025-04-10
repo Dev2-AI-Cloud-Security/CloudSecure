@@ -18,6 +18,7 @@
 }
 
 .login-title {
+  text-align: center;
   font-size: 24px;
   font-weight: 600;
   color: #333333; /* Darker title color for better contrast */

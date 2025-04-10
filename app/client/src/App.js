@@ -14,6 +14,8 @@ import ComputerIcon from '@mui/icons-material/Computer';
 import PeopleIcon from '@mui/icons-material/People';
 // import UserManagement from './components/UserManagement/UserManagement.';
 import Logo from './assets/brand_logo.webp';
+import LogoutIcon from '@mui/icons-material/Logout';
+
 const TerraformForm = lazy(() => import('./components/TerraformPage'));
 const LandingPage = lazy(() => import('./components/LandingPage'));
 const ThreatMonitoring = lazy(() => import('./components/ThreatMain.js'));
@@ -44,6 +46,11 @@ const NAVIGATION = [
     segment: 'users',
     title: 'User Management',
     icon: <PeopleIcon />,
+  },
+  {
+    segment: 'logout',
+    title: 'Logout',
+    icon: <LogoutIcon />,
   }
  
 ];
@@ -82,6 +89,15 @@ function DemoPageContent({ pathname }) {
       break;
     case '/login':
       Component = LoginPage;
+      break;
+    case '/logout':
+      Component = () => {
+        // Clear user data from localStorage or sessionStorage
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        // Redirect to login page
+        window.location.replace('/login');
+      }
       break;
     default:
       Component = () => (
@@ -139,7 +155,13 @@ function AppLayout(props) {
     }
   };
 
-  
+  const handleLogout = () => {
+    // Clear user data from localStorage or sessionStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    // Redirect to login page
+    router.navigate('/login');
+  };
 
   return (
     <AppProvider
@@ -153,6 +175,7 @@ function AppLayout(props) {
       theme={demoTheme}
       window={demoWindow}
     >
+      
       <DashboardLayout>
         <DemoPageContent pathname={router.pathname} />
       </DashboardLayout>

@@ -1,0 +1,23 @@
+services:
+  mongo-service:
+    image: mongo:latest
+    container_name: mongo-service
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo-user
+      MONGO_INITDB_ROOT_PASSWORD: mongo-password
+      MONGO_INITDB_DATABASE: cloudsecure
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: always
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db_data:
+  mongo_data:

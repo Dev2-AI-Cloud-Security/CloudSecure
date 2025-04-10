@@ -40,7 +40,7 @@ function LoginPage() {
   return (
     <div className="login-container">
       <div className="login-card">
-        <div className="login-title">Login</div>
+        <div className="login-title">CloudSecure</div>
         <div className="login-form">
           <div className="form-group">
             <div className="form-label">Email / Username</div>
