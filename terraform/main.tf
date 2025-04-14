@@ -11,7 +11,7 @@ data "aws_vpc" "default" {
 # Fetch the default subnet in the default VPC
 data "aws_subnet" "default" {
   vpc_id            = data.aws_vpc.default.id
-  availability_zone = "us-east-2a"
+  availability_zone = "us-east-1a"
   default_for_az    = true
 }
 
