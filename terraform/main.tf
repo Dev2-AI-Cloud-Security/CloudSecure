@@ -48,7 +48,7 @@ resource "aws_instance" "cloudsecure" {
 
   # Set root volume to 10 GiB
   root_block_device {
-    volume_size           = 30 # GiB
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -63,7 +63,7 @@ resource "aws_instance" "cloudsecure" {
               # Resize partition and filesystem
               echo "Resizing partition..." > /home/ec2-user/resize.log 2>&1
               growpart /dev/xvda 1 >> /home/ec2-user/resize.log 2>&1 || echo "growpart failed" >> /home/ec2-user/resize.log
-              echo "Resizing filesystem..." >> /home/ec2-user/resize.log 2>&1
+              echo "Resizing filesystem..." > /home/ec2-user/resize.log 2>&1
               xfs_growfs / >> /home/ec2-user/resize.log 2>&1 || echo "xfs_growfs failed" >> /home/ec2-user/resize.log
               df -h / >> /home/ec2-user/resize.log 2>&1
               # Ensure the log is readable
