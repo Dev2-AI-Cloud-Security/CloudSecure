@@ -5,10 +5,10 @@ on:
     branches:
       - cicd-v3
     paths:
-      - 'app/client/**'  # Trigger on changes in app/client
-      - 'app/server/**'  # Trigger on changes in app/server
-      - 'docker-compose.yml'  # Trigger on changes to docker-compose.yml
-      - '.github/workflows/deploy.yml'  # Trigger on changes to this workflow
+      - 'app/client/**'
+      - 'app/server/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:
@@ -149,6 +149,12 @@ jobs:
       # Deploy Docker Compose
       - name: Deploy Docker Compose
         run: |
+          echo "Creating cloudsecure directory on EC2 instance..."
+          ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
+            mkdir -p /home/ec2-user/cloudsecure
+            chown ec2-user:ec2-user /home/ec2-user/cloudsecure
+            chmod 755 /home/ec2-user/cloudsecure
+          EOF
           echo "Copying docker-compose.yml to EC2 instance..."
           scp -o StrictHostKeyChecking=no -i /home/runner/key.pem docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/ || {
             echo "SCP failed."
