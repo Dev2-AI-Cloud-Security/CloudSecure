@@ -1,15 +1,13 @@
-version: '3.8'  # Specify a version for compatibility
+version: '3.8'
 
 services:
   client:
-    build:
-      context: ./app/client
-      dockerfile: Dockerfile
+    image: cvcharanraj/cloudsecure-client:latest  # Pull from Docker Hub
     container_name: cloudsecure-client
     environment:
       - REACT_APP_API_URL=http://cloudsecure-server:3000
       - API_BASE_URL=http://cloudsecure-server:3000
-      - NODE_ENV=production  # Set to production for optimized builds
+      - NODE_ENV=production
     ports:
       - "80:80"
     depends_on:
@@ -20,8 +18,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"  # Limit logs to 10MB per container
-        max-file: "3"    # Keep up to 3 log files
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
@@ -30,9 +28,7 @@ services:
       start_period: 10s
 
   server:
-    build:
-      context: ./app/server
-      dockerfile: Dockerfile
+    image: cvcharanraj/cloudsecure-server:latest  # Pull from Docker Hub
     container_name: cloudsecure-server
     ports:
       - "3000:3000"
@@ -42,7 +38,7 @@ services:
     environment:
       - MONGODB_URI=mongodb://mongo-user:mongo-password@mongo-service:27017/cloudsecure?authSource=admin
       - PORT=3000
-      - NODE_ENV=production  # Set to production
+      - NODE_ENV=production
     restart: unless-stopped
     networks:
       - app-network
@@ -52,7 +48,7 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]  # Assumes a /health endpoint; adjust as needed
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]  # Adjust if no /health endpoint
       interval: 30s
       timeout: 10s
       retries: 3
@@ -66,7 +62,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: mongo-password
       MONGO_INITDB_DATABASE: cloudsecure
     ports:
-      - "27017:27017"  # Expose for debugging; remove in production if not needed
+      - "27017:27017"  # Remove in production if not needed
     volumes:
       - mongo_data:/data/db
     restart: always
@@ -88,7 +84,7 @@ services:
     image: redis:latest
     container_name: redis-service
     ports:
-      - "6379:6379"  # Expose for debugging; remove in production if not needed
+      - "6379:6379"  # Remove in production if not needed
     restart: always
     networks:
       - app-network
@@ -109,4 +105,4 @@ networks:
     driver: bridge
 
 volumes:
-  mongo_data:  # Removed unused db_data volume
+  mongo_data:
