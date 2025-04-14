@@ -45,7 +45,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
+          aws-region: us-east-1 # Aligned with main.tf
 
       # Initialize Terraform
       - name: Terraform Init
@@ -67,7 +67,11 @@ jobs:
       - name: Terraform Apply
         working-directory: ./terraform
         run: |
-          terraform apply -auto-approve
+          terraform apply -auto-approve || {
+            echo "Terraform apply failed. Outputting logs..."
+            terraform output -raw instance_ip || echo "No instance IP output"
+            exit 1
+          }
           IP=$(terraform output -raw instance_ip | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' || echo "")
           if [ -z "$IP" ]; then
             echo "No running EC2 instance found and none created. Exiting."

@@ -11,7 +11,7 @@ data "aws_vpc" "default" {
 # Fetch the default subnet in the default VPC
 data "aws_subnet" "default" {
   vpc_id            = data.aws_vpc.default.id
-  availability_zone = "us-east-1a" # Adjust if needed
+  availability_zone = "us-east-1a"
   default_for_az    = true
 }
 
@@ -46,7 +46,7 @@ resource "aws_instance" "cloudsecure" {
   subnet_id              = data.aws_subnet.default.id
   vpc_security_group_ids = [data.aws_security_group.cloudsecure_sg.id]
 
-  # Set root volume to 10 GiB
+  # Set root volume to 10 GiB (or adjust as needed)
   root_block_device {
     volume_size           = 10 # GiB
     volume_type           = "gp3"
@@ -71,7 +71,7 @@ resource "aws_instance" "cloudsecure" {
               EOF
 
   tags = {
-    Name = "cloudsecure-instance-${timestamp()}" # Unique tag to force recreation
+    Name = "cloudsecure-instance-${timestamp()}"
   }
 
   lifecycle {
