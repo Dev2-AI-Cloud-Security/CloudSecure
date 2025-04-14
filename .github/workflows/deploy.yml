@@ -3,7 +3,7 @@ name: Deploy CloudSecure to AWS EC2
 on:
   push:
     branches:
-      - main
+      - cicd-v3
 
 jobs:
   deploy:
@@ -94,6 +94,16 @@ jobs:
       - name: Terraform Init
         working-directory: ./terraform
         run: terraform init
+
+      - name: Terminate Existing Instances
+        working-directory: ./terraform
+        run: |
+          echo "Destroying existing Terraform-managed resources..."
+          terraform destroy -auto-approve || {
+            echo "No resources to destroy or destroy failed. Continuing..."
+          }
+          echo "Ensuring clean state..."
+          terraform init -reconfigure
 
       - name: Terraform Apply
         working-directory: ./terraform
