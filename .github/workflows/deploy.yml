@@ -45,7 +45,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1 # Aligned with main.tf
+          aws-region: us-east-1
 
       # Initialize Terraform
       - name: Terraform Init
@@ -64,11 +64,21 @@ jobs:
         run: |
           echo "Contents of main.tf:"
           cat main.tf
+          if grep -q "volume_size.*=.*10" main.tf; then
+            echo "Confirmed volume_size = 10 in main.tf"
+          elif grep -q "volume_size.*=.*30" main.tf; then
+            echo "Confirmed volume_size = 30 in main.tf"
+          else
+            echo "Error: volume_size not found in main.tf"
+            exit 1
+          fi
 
       # Terminate existing instances
       - name: Terminate Existing Instances
         working-directory: ./terraform
         run: |
+          echo "Clearing Terraform state..."
+          rm -f terraform.tfstate terraform.tfstate.backup
           echo "Destroying existing Terraform-managed resources..."
           terraform destroy -auto-approve || {
             echo "No resources to destroy or destroy failed. Continuing..."
@@ -104,7 +114,7 @@ jobs:
           fi
           echo "ip=$IP" >> $GITHUB_OUTPUT
 
-      # Install SSH key for EC2 access
+      # Install and validate SSH key
       - name: Install SSH Key
         run: |
           if [ -z "${{ secrets.EC2_SSH_KEY }}" ]; then
@@ -113,17 +123,26 @@ jobs:
           fi
           echo "${{ secrets.EC2_SSH_KEY }}" > /home/runner/key.pem
           chmod 400 /home/runner/key.pem
+          # Validate key format
+          ssh-keygen -y -P "" -f /home/runner/key.pem > /home/runner/key.pub || {
+            echo "Error: Invalid SSH private key format"
+            exit 1
+          }
+          echo "SSH key validated successfully"
 
-      # Debug SSH Key and Connection
+      # Debug SSH Connection with extended timeout
       - name: Debug SSH Connection
         run: |
-          echo "Verifying SSH key and connection..."
-          ssh-keygen -y -f /home/runner/key.pem > /dev/null || (echo "Invalid SSH key format" && exit 1)
-          for i in {1..10}; do
-            ssh -vvv -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} "echo 'SSH successful'" && break
-            echo "Attempt $i failed. Retrying in 15 seconds..."
-            sleep 15
-          done || (echo "SSH connection failed after 10 attempts" && exit 1)
+          echo "Verifying SSH connection to ec2-user@${{ steps.ec2-ip.outputs.ip }}..."
+          for i in {1..15}; do
+            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} "echo 'SSH successful'" && break
+            echo "Attempt $i failed. Retrying in 20 seconds..."
+            sleep 20
+          done || {
+            echo "SSH connection failed after 15 attempts. Checking instance details..."
+            ssh -v -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} "whoami" || true
+            exit 1
+          }
 
       # Wait for EC2 to be ready
       - name: Wait for EC2 Instance
@@ -145,8 +164,13 @@ jobs:
       # Deploy Docker Containers
       - name: Deploy Docker Compose
         run: |
-          # Copy the pre-built client build folder, server code, and docker-compose.yml
-          scp -i /home/runner/key.pem -r ./app/client/build ./app/server docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/
+          echo "Copying files to EC2 instance..."
+          scp -o StrictHostKeyChecking=no -i /home/runner/key.pem -r ./app/client/build ./app/server docker-compose.yml ec2-user@${{ steps.ec2-ip.outputs.ip }}:/home/ec2-user/cloudsecure/ || {
+            echo "SCP failed. Checking connection..."
+            ssh -v -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} "whoami" || true
+            exit 1
+          }
+          echo "Deploying Docker Compose..."
           ssh -o StrictHostKeyChecking=no -i /home/runner/key.pem ec2-user@${{ steps.ec2-ip.outputs.ip }} << 'EOF'
             # Debug OS
             cat /etc/os-release || echo "OS info unavailable"
