@@ -9,6 +9,49 @@ const jwt = require('jsonwebtoken');
 const User = require('./models/User');
 const fs = require('fs');
 const path = require('path');
+const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+
+// Swagger Configuration
+const swaggerOptions = {
+  swaggerDefinition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'CloudSecure API',
+      version: '1.0.0',
+      description: 'API documentation for CloudSecure',
+      contact: {
+        name: 'CloudSecure Team',
+        email: 'support@cloudsecure.com',
+      },
+    },
+    servers: [
+      {
+        url: 'http://localhost:3001',
+        description: 'Development Server',
+      },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
+  },
+  apis: ['./server.js'], // Path to the API docs
+};
+
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+console.log('Swagger documentation available at /api-docs');
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -209,6 +252,32 @@ const runInsightsQuery = async (queryString, startTime, endTime) => {
 };
 
 // API Endpoints
+
+/**
+ * @swagger
+ * /api/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *       400:
+ *         description: Username already exists
+ *       500:
+ *         description: Error registering user
+ */
 app.post('/api/register', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -223,6 +292,32 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+
+/**
+ * @swagger
+ * /api/login:
+ *   post:
+ *     summary: Login a user
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Logged in successfully
+ *       400:
+ *         description: Invalid credentials
+ *       500:
+ *         description: Error logging in
+ */
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -259,6 +354,22 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Protected Endpoints
+/**
+ * @swagger
+ * /api/threats:
+ *   get:
+ *     summary: Get threat data
+ *     tags: [Threats]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of threats
+ *       401:
+ *         description: Access token required
+ *       500:
+ *         description: Failed to fetch threats
+ */
 app.get('/api/threats', authenticateToken, async (req, res) => {
   try {
     const queryString = `
