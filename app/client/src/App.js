@@ -7,6 +7,7 @@ import ThreatDash from "./components/ThreatDash";
 const App = () => {
   const [showChat, setShowChat] = useState(false);
   const [messages, setMessages] = useState([]);
+  const [isListening, setIsListening] = useState(false);
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
 
@@ -38,6 +39,39 @@ const App = () => {
       ]);
       console.error("Chatbot error:", error);
     }
+  };
+
+  const startListening = () => {
+    if (!("webkitSpeechRecognition" in window)) {
+      alert("Your browser does not support speech recognition. Please use Google Chrome.");
+      return;
+    }
+
+    const recognition = new window.webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      document.getElementById("userInput").value = transcript;
+      sendMessage();
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.start();
   };
 
   return (
@@ -104,6 +138,20 @@ const App = () => {
               style={{ flex: 1 }}
             />
             <button onClick={sendMessage}>Send</button>
+            <button
+              onClick={startListening}
+              title="Speak"
+              style={{
+                padding: "0 10px",
+                backgroundColor: isListening ? "#28a745" : "#6c757d",
+                color: "white",
+                border: "none",
+                borderRadius: "5px",
+                cursor: "pointer",
+              }}
+            >
+              🎤
+            </button>
           </div>
         </div>
       )}
