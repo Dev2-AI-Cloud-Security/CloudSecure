@@ -64,7 +64,7 @@ console.log('Swagger documentation available at /api-docs');
 
 
 app.use(cors({
-  origin: 'http://localhost:3000', // Explicitly allow the frontend origin
+  origin: 'http://localhost:3030', // Explicitly allow the frontend origin
   credentials: true, // Allow credentials (cookies, authorization headers, etc.)
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow these methods
   allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
@@ -400,6 +400,35 @@ app.get('/api/threats', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/resolved-issues:
+ *   get:
+ *     summary: Get resolved issues
+ *     tags: [Threats]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of resolved issues
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   timestamp:
+ *                     type: string
+ *                     description: Timestamp of the resolved issue
+ *                   count:
+ *                     type: integer
+ *                     description: Number of resolved issues
+ *       401:
+ *         description: Access token required
+ *       500:
+ *         description: Failed to fetch resolved issues
+ */
 app.get('/api/resolved-issues', authenticateToken, async (req, res) => {
   try {
     const queryString = `
@@ -427,6 +456,35 @@ app.get('/api/resolved-issues', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/risk-levels:
+ *   get:
+ *     summary: Get risk levels
+ *     tags: [Threats]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Risk levels
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   level:
+ *                     type: string
+ *                     description: Risk level (High, Medium, Low)
+ *                   count:
+ *                     type: integer
+ *                     description: Number of occurrences for the risk level
+ *       401:
+ *         description: Access token required
+ *       500:
+ *         description: Failed to fetch risk levels
+ */
 app.get('/api/risk-levels', authenticateToken, async (req, res) => {
   try {
     // Rewrite the query without using 'case'
@@ -483,6 +541,36 @@ app.get('/api/risk-levels', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/alerts:
+ *   get:
+ *     summary: Get recent alerts
+ *     tags: [Alerts]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of recent alerts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   incident:
+ *                     type: string
+ *                     description: Incident details
+ *                   status:
+ *                     type: string
+ *                     description: Status of the alert (Ongoing or Resolved)
+ *       401:
+ *         description: Access token required
+ *       500:
+ *         description: Failed to fetch alerts
+ */
+
 app.get('/api/alerts', authenticateToken, async (req, res) => {
   try {
     const queryString = `
@@ -517,6 +605,30 @@ app.get('/api/alerts', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /save-terraform-config:
+ *   post:
+ *     summary: Save Terraform configuration
+ *     tags: [Terraform]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               config:
+ *                 type: string
+ *                 description: Terraform configuration content
+ *     responses:
+ *       200:
+ *         description: Terraform configuration saved successfully
+ *       400:
+ *         description: No configuration provided
+ *       500:
+ *         description: Failed to save configuration
+ */
 app.post('/save-terraform-config', (req, res) => {
   const { config } = req.body;
 
@@ -538,6 +650,20 @@ app.post('/save-terraform-config', (req, res) => {
 const { exec } = require('child_process');
 
 // Deploy API to run Terraform
+/**
+ * @swagger
+ * /deploy:
+ *   post:
+ *     summary: Deploy resources using Terraform
+ *     tags: [Terraform]
+ *     responses:
+ *       200:
+ *         description: Terraform deployment completed successfully
+ *       400:
+ *         description: Terraform configuration file not found
+ *       500:
+ *         description: Failed to deploy resources
+ */
 app.post('/deploy', async (req, res) => {
   const terraformFilePath = path.join(__dirname, 'terraform-config.tf');
 
@@ -568,7 +694,7 @@ app.post('/deploy', async (req, res) => {
 });
 
 // Start Server
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3031;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
