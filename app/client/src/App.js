@@ -15,7 +15,6 @@ import PeopleIcon from '@mui/icons-material/People';
 // import UserManagement from './components/UserManagement/UserManagement.';
 import Logo from './assets/brand_logo.webp';
 import LogoutIcon from '@mui/icons-material/Logout';
-import { Link } from '@mui/material';
 
 
 const TerraformForm = lazy(() => import('./components/TerraformPage'));
@@ -179,17 +178,6 @@ function AppLayout(props) {
     >
       
       <DashboardLayout>
-        {/* Add Swagger API Docs Link */}
-        <div style={{ position: 'absolute', top: '10px', right: '10px' }}>
-          <Link
-            href="http://localhost:3031/api-docs"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ textDecoration: 'none', color: '#1976d2', fontWeight: 'bold' }}
-          >
-            API Docs
-          </Link>
-        </div>
         <DemoPageContent pathname={router.pathname} />
       </DashboardLayout>
       <>
