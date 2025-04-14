@@ -48,7 +48,7 @@ resource "aws_instance" "cloudsecure" {
 
   # Set root volume to 10 GiB
   root_block_device {
-    volume_size           = 10 # GiB
+    volume_size           = 30 # GiB
     volume_type           = "gp3"
     delete_on_termination = true
   }
