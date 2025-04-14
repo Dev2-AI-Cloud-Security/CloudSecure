@@ -45,12 +45,16 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1 # Aligned with main.tf
+          aws-region: us-east-2 # Aligned with main.tf
 
       # Initialize Terraform
       - name: Terraform Init
         working-directory: ./terraform
-        run: terraform init
+        run: |
+          terraform init || {
+            echo "Terraform init failed."
+            exit 1
+          }
 
       # Terminate existing instances
       - name: Terminate Existing Instances

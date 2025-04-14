@@ -11,7 +11,7 @@ data "aws_vpc" "default" {
 # Fetch the default subnet in the default VPC
 data "aws_subnet" "default" {
   vpc_id            = data.aws_vpc.default.id
-  availability_zone = "us-east-1a"
+  availability_zone = "us-east-2a"
   default_for_az    = true
 }
 
@@ -46,7 +46,7 @@ resource "aws_instance" "cloudsecure" {
   subnet_id              = data.aws_subnet.default.id
   vpc_security_group_ids = [data.aws_security_group.cloudsecure_sg.id]
 
-  # Set root volume to 10 GiB (or adjust as needed)
+  # Set root volume to 10 GiB
   root_block_device {
     volume_size           = 10 # GiB
     volume_type           = "gp3"
