@@ -49,9 +49,6 @@ const swaggerOptions = {
   apis: ['./server.js'], // Path to the API docs
 };
 
-const swaggerDocs = swaggerJsDoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-console.log('Swagger documentation available at /api-docs');
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -60,6 +57,12 @@ AWS.config.update({
 });
 
 const app = express();
+
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+console.log('Swagger documentation available at /api-docs');
+
+
 app.use(cors({
   origin: 'http://localhost:3000', // Explicitly allow the frontend origin
   credentials: true, // Allow credentials (cookies, authorization headers, etc.)
