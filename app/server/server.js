@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const redis = require('redis');
 
 const app = express();
 
@@ -235,24 +236,47 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// Helper function to run a CloudWatch Logs Insights query
-const runInsightsQuery = async (queryString, startTime, endTime) => {
-  const params = {
-    queryString,
-    startTime,
-    endTime,
-    logGroupNames: [logGroupName],
-  };
+// Create Redis client
+const redisClient = redis.createClient({
+  url: process.env.REDIS_URL || 'redis://localhost:6379',
+});
 
+redisClient.on('error', (err) => {
+  console.error('Redis error:', err);
+});
+
+// Connect to Redis
+(async () => {
+  await redisClient.connect();
+  console.log('✅ Connected to Redis');
+})();
+
+// Helper function to run a CloudWatch Logs Insights query with Redis caching
+const runInsightsQueryWithCache = async (queryKey, queryString, startTime, endTime) => {
   try {
+    // Check if the data is already cached in Redis
+    const cachedData = await redisClient.get(queryKey);
+    if (cachedData) {
+      console.log(`Cache hit for key: ${queryKey}`);
+      return JSON.parse(cachedData); // Return cached data
+    }
+
+    console.log(`Cache miss for key: ${queryKey}. Querying AWS CloudWatch Logs...`);
+
+    // Run the CloudWatch Logs Insights query
+    const params = {
+      queryString,
+      startTime,
+      endTime,
+      logGroupNames: [logGroupName],
+    };
+
     const queryResponse = await cloudwatchlogs.startQuery(params).promise();
     const queryId = queryResponse.queryId;
 
     let results;
     while (true) {
-      const resultResponse = await cloudwatchlogs.getQueryResults({
-        queryId,
-      }).promise();
+      const resultResponse = await cloudwatchlogs.getQueryResults({ queryId }).promise();
 
       if (resultResponse.status === 'Complete') {
         results = resultResponse.results;
@@ -260,12 +284,15 @@ const runInsightsQuery = async (queryString, startTime, endTime) => {
       } else if (resultResponse.status === 'Failed' || resultResponse.status === 'Cancelled') {
         throw new Error('Query failed or was cancelled');
       }
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait before retrying
     }
+
+    // Cache the results in Redis with a TTL (e.g., 1 hour)
+    await redisClient.set(queryKey, JSON.stringify(results), { EX: 3600 });
 
     return results;
   } catch (error) {
-    console.error('Error running CloudWatch Logs Insights query:', error);
+    console.error('Error running CloudWatch Logs Insights query with cache:', error);
     throw error;
   }
 };
@@ -399,16 +426,21 @@ app.get('/api/threats', authenticateToken, async (req, res) => {
     `;
     const endTime = Math.floor(Date.now() / 1000);
     const startTime = endTime - 24 * 60 * 60;
-    const results = await runInsightsQuery(queryString, startTime, endTime);
 
-    const threats = results.map(row => {
-      const timestampField = row.find(field => field.field === '@timestamp');
-      const countField = row.find(field => field.field === 'threatCount');
+    // Use a unique key for caching based on the query and time range
+    const queryKey = `threats:${startTime}:${endTime}`;
+
+    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime);
+
+    const threats = results.map((row) => {
+      const timestampField = row.find((field) => field.field === '@timestamp');
+      const countField = row.find((field) => field.field === 'threatCount');
       return {
         timestamp: timestampField ? timestampField.value : new Date().toISOString(),
         count: countField ? parseInt(countField.value) : 0,
       };
     });
+
     res.json(threats);
   } catch (error) {
     console.error('Error fetching threats:', error);
@@ -455,16 +487,19 @@ app.get('/api/resolved-issues', authenticateToken, async (req, res) => {
     `;
     const endTime = Math.floor(Date.now() / 1000);
     const startTime = endTime - 365 * 24 * 60 * 60;
-    const results = await runInsightsQuery(queryString, startTime, endTime);
 
-    const resolvedIssues = results.map(row => {
-      const timestampField = row.find(field => field.field === '@timestamp');
-      const countField = row.find(field => field.field === 'resolvedCount');
+    const queryKey = `resolved-issues:${startTime}:${endTime}`;
+    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime);
+
+    const resolvedIssues = results.map((row) => {
+      const timestampField = row.find((field) => field.field === '@timestamp');
+      const countField = row.find((field) => field.field === 'resolvedCount');
       return {
         timestamp: timestampField ? timestampField.value : new Date().toISOString(),
         count: countField ? parseInt(countField.value) : 0,
       };
     });
+
     res.json(resolvedIssues);
   } catch (error) {
     console.error('Error fetching resolved issues:', error);
@@ -503,7 +538,6 @@ app.get('/api/resolved-issues', authenticateToken, async (req, res) => {
  */
 app.get('/api/risk-levels', authenticateToken, async (req, res) => {
   try {
-    // Rewrite the query without using 'case'
     const queryString = `
       fields action, terminatingRuleId
       | parse terminatingRuleId "SQL*" as isSQL
@@ -512,13 +546,14 @@ app.get('/api/risk-levels', authenticateToken, async (req, res) => {
     `;
     const endTime = Math.floor(Date.now() / 1000);
     const startTime = endTime - 24 * 60 * 60;
-    const results = await runInsightsQuery(queryString, startTime, endTime);
 
-    // Transform the results into risk levels
-    const riskLevels = results.map(row => {
-      const actionField = row.find(field => field.field === 'action');
-      const isSQLField = row.find(field => field.field === 'isSQL');
-      const countField = row.find(field => field.field === 'riskCount');
+    const queryKey = `risk-levels:${startTime}:${endTime}`;
+    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime);
+
+    const riskLevels = results.map((row) => {
+      const actionField = row.find((field) => field.field === 'action');
+      const isSQLField = row.find((field) => field.field === 'isSQL');
+      const countField = row.find((field) => field.field === 'riskCount');
 
       const action = actionField ? actionField.value : 'Unknown';
       const isSQL = isSQLField ? isSQLField.value : 'false';
@@ -539,9 +574,8 @@ app.get('/api/risk-levels', authenticateToken, async (req, res) => {
       };
     });
 
-    // Aggregate counts by level
     const aggregatedRiskLevels = riskLevels.reduce((acc, curr) => {
-      const existing = acc.find(item => item.level === curr.level);
+      const existing = acc.find((item) => item.level === curr.level);
       if (existing) {
         existing.count += curr.count;
       } else {
@@ -598,12 +632,14 @@ app.get('/api/alerts', authenticateToken, async (req, res) => {
     `;
     const endTime = Math.floor(Date.now() / 1000);
     const startTime = endTime - 24 * 60 * 60;
-    const results = await runInsightsQuery(queryString, startTime, endTime);
 
-    const alerts = results.map(row => {
-      const actionField = row.find(field => field.field === 'action');
-      const ruleField = row.find(field => field.field === 'terminatingRuleId');
-      const uriField = row.find(field => field.field === 'uri');
+    const queryKey = `alerts:${startTime}:${endTime}`;
+    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime);
+
+    const alerts = results.map((row) => {
+      const actionField = row.find((field) => field.field === 'action');
+      const ruleField = row.find((field) => field.field === 'terminatingRuleId');
+      const uriField = row.find((field) => field.field === 'uri');
 
       const action = actionField ? actionField.value : 'Unknown';
       const rule = ruleField ? ruleField.value : 'Unknown';
