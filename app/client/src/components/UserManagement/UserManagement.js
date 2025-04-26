@@ -6,6 +6,7 @@ import {
   Typography,
   Divider,
 } from '@mui/material';
+import { useAwsCredentials } from '../AwsCredentialsContext';
 
 const drawerWidth = 240;
 
@@ -15,6 +16,9 @@ const UserManagement = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [address, setAddress] = useState('');
   const [contactDetails, setContactDetails] = useState('');
+  const [awsAccessKeyId, setAwsAccessKeyId] = useState('');
+  const [awsSecretAccessKey, setAwsSecretAccessKey] = useState('');
+  const { setAwsCredentials } = useAwsCredentials();
 
   const handleChangePassword = () => {
     if (newPassword !== confirmPassword) {
@@ -31,6 +35,22 @@ const UserManagement = () => {
     if (confirmDelete) {
       alert('Account deleted successfully!');
     }
+  };
+
+  const handleSaveAwsCredentials = () => {
+    if (!awsAccessKeyId || !awsSecretAccessKey) {
+      alert('Please provide both AWS Access Key ID and Secret Access Key.');
+      return;
+    }
+    // Save credentials to context
+    setAwsCredentials({
+      accessKeyId: awsAccessKeyId,
+      secretAccessKey: awsSecretAccessKey,
+    });
+    alert('AWS credentials saved successfully!');
+    // Optionally, clear the fields after saving
+    // setAwsAccessKeyId('');
+    // setAwsSecretAccessKey('');
   };
 
   return (
@@ -67,6 +87,31 @@ const UserManagement = () => {
         onClick={handleChangePassword}
       >
         Change Password
+      </Button>
+
+      <Divider />
+
+      {/* AWS Credentials Section */}
+      <Typography variant="h6">AWS Credentials</Typography>
+      <TextField
+        label="AWS Access Key ID"
+        fullWidth
+        value={awsAccessKeyId}
+        onChange={(e) => setAwsAccessKeyId(e.target.value)}
+      />
+      <TextField
+        label="AWS Secret Access Key"
+        type="password"
+        fullWidth
+        value={awsSecretAccessKey}
+        onChange={(e) => setAwsSecretAccessKey(e.target.value)}
+      />
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={handleSaveAwsCredentials}
+      >
+        Save AWS Credentials
       </Button>
 
       <Divider />
