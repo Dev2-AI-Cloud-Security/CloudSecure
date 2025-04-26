@@ -1,3 +1,4 @@
+import axios from 'axios';
 
 // Base configuration for API requests
 export const apiConfig = {
@@ -8,16 +9,16 @@ export const apiConfig = {
   },
 };
 
-// Utility function to create API requests with fetch
+// Utility function to create API requests with axios
 export const createApiRequest = async (endpoint, method = 'GET', data = null, token = null) => {
   try {
     const config = {
       method,
+      url: `${apiConfig.baseURL}${endpoint}`,
       headers: {
         ...apiConfig.headers, // Include default headers
       },
-      credentials: 'include', // Include cookies if needed (e.g., for sessions)
-      mode: 'cors', // Enable CORS
+      withCredentials: true, // Include cookies if needed (e.g., for sessions)
     };
 
     // Add Authorization header if a token is provided
@@ -25,36 +26,29 @@ export const createApiRequest = async (endpoint, method = 'GET', data = null, to
       config.headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // Add body for POST/PUT requests
+    // Add data for POST/PUT requests
     if (data) {
-      config.body = JSON.stringify(data);
+      config.data = data;
     }
 
-    const response = await fetch(`${apiConfig.baseURL}${endpoint}`, config);
+    const response = await axios(config);
 
-    // Handle non-JSON responses (e.g., server errors)
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error(`Unexpected response format: ${response.statusText}`);
-    }
-
-    const responseData = await response.json();
-
-    // Check for HTTP errors (e.g., 401, 403, 500)
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
+    return response.data; // Return the response data
+  } catch (error) {
+    // Handle HTTP errors
+    if (error.response) {
+      const { status, data } = error.response;
+      if (status === 401 || status === 403) {
         // Handle token expiration or invalid token
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.replace('/login');
       }
-      throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
+      throw new Error(data.message || `HTTP error! status: ${status}`);
+    } else {
+      console.error(`API request failed for ${endpoint}:`, error.message);
+      throw new Error(error.message || 'Network error');
     }
-
-    return responseData;
-  } catch (error) {
-    console.error(`API request failed for ${endpoint}:`, error.message);
-    throw error;
   }
 };
 

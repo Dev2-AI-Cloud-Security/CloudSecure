@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -12,7 +11,25 @@ const path = require('path');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
+const app = express();
 
+// CORS Configuration
+const allowedOrigins = ['http://localhost:3030', 'http://localhost:3000']; // Add all allowed origins here
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true); // Allow the request
+    } else {
+      callback(new Error('Not allowed by CORS')); // Reject the request
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow these HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
+  credentials: true, // Allow cookies and credentials
+}));
+
+app.use(express.json());
 
 // Swagger Configuration
 const swaggerOptions = {
@@ -58,15 +75,11 @@ AWS.config.update({
   region: process.env.AWS_REGION || 'us-east-1',
 });
 
-const app = express();
-
-app.use(cors());
-
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 console.log('Swagger documentation available at /api-docs');
 
-app.use(express.json());
+
 
 // Configure AWS SDK
 AWS.config.update({
@@ -200,6 +213,12 @@ initializeCloudWatch();
 
 // Middleware to Verify JWT
 const authenticateToken = (req, res, next) => {
+  // Bypass authentication for localhost
+  const clientIp = req.ip || req.connection.remoteAddress;
+  if (clientIp === '::1' || clientIp === '127.0.0.1' || req.hostname === 'localhost') {
+    return next(); // Skip authentication for localhost
+  }
+
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
 
