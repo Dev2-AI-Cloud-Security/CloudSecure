@@ -12,6 +12,8 @@ const path = require('path');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
+
+
 // Swagger Configuration
 const swaggerOptions = {
   swaggerDefinition: {
@@ -27,7 +29,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: 'http://localhost:3001',
+        url: 'http://localhost:3031',
         description: 'Development Server',
       },
     ],
@@ -58,17 +60,12 @@ AWS.config.update({
 
 const app = express();
 
+app.use(cors());
+
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 console.log('Swagger documentation available at /api-docs');
 
-
-app.use(cors({
-  origin: 'http://localhost:3030', // Explicitly allow the frontend origin
-  credentials: true, // Allow credentials (cookies, authorization headers, etc.)
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow these methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
-}));
 app.use(express.json());
 
 // Configure AWS SDK

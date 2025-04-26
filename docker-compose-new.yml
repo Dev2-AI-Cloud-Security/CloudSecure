@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: cloudsecure-client
     environment:
-      - REACT_APP_API_URL=http://cloudsecure-server:3000
+      - REACT_APP_API_URL=http://cloudsecure-server:3030
       - NODE_ENV=development
     ports:
       - "80:80"
@@ -20,7 +20,7 @@ services:
       dockerfile: Dockerfile
     container_name: cloudsecure-server
     ports:
-      - "3000:3000"
+      - "3030:3030"
     depends_on:
       - redis-service
       - mongo-service

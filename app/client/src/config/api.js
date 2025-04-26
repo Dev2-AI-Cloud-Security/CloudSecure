@@ -1,7 +1,7 @@
 
 // Base configuration for API requests
 export const apiConfig = {
-  baseURL: process.env.API_BASE_URL || 'http://localhost:3001',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3031',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
