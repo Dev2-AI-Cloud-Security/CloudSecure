@@ -97,7 +97,7 @@ resource "aws_s3_bucket" "my_bucket" {
     setTerraformConfig(config);
     setOpenSnackbar(true);
     try {
-      const response = await fetch('http://localhost:3001/save-terraform-config', {
+      const response = await fetch('http://localhost:3031/save-terraform-config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +119,7 @@ resource "aws_s3_bucket" "my_bucket" {
   const handleDeploy = async () => {
     setIsDeploying(true);
     try {
-      const response = await fetch('http://localhost:3001/deploy', {
+      const response = await fetch('http://localhost:3031/deploy', {
         method: 'POST',
       });
   
@@ -307,7 +307,7 @@ resource "aws_s3_bucket" "my_bucket" {
       {/* Snackbar for feedback */}
       <Snackbar
         open={openSnackbar}
-        autoHideDuration={3000}
+        autoHideDuration={3030}
         onClose={() => setOpenSnackbar(false)}
       >
         <Alert onClose={() => setOpenSnackbar(false)} severity="success">

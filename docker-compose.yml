@@ -5,9 +5,10 @@ services:
     image: cvcharanraj/cloudsecure-client:latest  # Pull from Docker Hub
     container_name: cloudsecure-client
     environment:
-      - REACT_APP_API_URL=http://cloudsecure-server:3000
-      - API_BASE_URL=http://cloudsecure-server:3000
-      - NODE_ENV=production
+      - REACT_APP_API_URL=http://cloudsecure-server:3030
+      - REACT_APP_API_URL=http://cloudsecure-server:3030
+      - NODE_ENV=development
+
     ports:
       - "80:80"
     depends_on:
@@ -31,14 +32,15 @@ services:
     image: cvcharanraj/cloudsecure-server:latest  # Pull from Docker Hub
     container_name: cloudsecure-server
     ports:
-      - "3000:3000"
+      - "3030:3030"
     depends_on:
       - redis-service
       - mongo-service
     environment:
-      - MONGODB_URI=mongodb://mongo-user:mongo-password@mongo-service:27017/cloudsecure?authSource=admin
-      - PORT=3000
-      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongo-service:27017
+      - PORT=3030
+      - NODE_ENV=development
+
     restart: unless-stopped
     networks:
       - app-network

@@ -125,7 +125,7 @@ function AppLayout(props) {
   const demoWindow = window !== undefined ? window() : undefined;
   const [showChat, setShowChat] = useState(false);
   const [messages, setMessages] = useState([]);
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3031";
 
   const toggleChat = () => {
     setShowChat(!showChat);
