@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState } from 'react';
+import {useState} from 'react';
 import PropTypes from 'prop-types';
 import { lazy, Suspense } from 'react';
 import { createTheme } from '@mui/material/styles';
@@ -12,19 +12,17 @@ import HomeIcon from '@mui/icons-material/Home';
 import SecurityIcon from '@mui/icons-material/Security';
 import ComputerIcon from '@mui/icons-material/Computer';
 import PeopleIcon from '@mui/icons-material/People';
+// import UserManagement from './components/UserManagement/UserManagement.';
+import Logo from './assets/brand_logo.webp';
 import LogoutIcon from '@mui/icons-material/Logout';
 
-import { AwsCredentialsProvider } from './components/AwsCredentialsContext.js'; // Import the context provider
-import Logo from './assets/brand_logo.webp';
 
-// Lazy-loaded components
 const TerraformForm = lazy(() => import('./components/TerraformPage'));
 const LandingPage = lazy(() => import('./components/LandingPage'));
 const ThreatMonitoring = lazy(() => import('./components/ThreatMain.js'));
 const UserManagement = lazy(() => import('./components/UserManagement/layout.js'));
 const LoginPage = lazy(() => import('./components/LoginPage'));
 
-// Navigation configuration
 const NAVIGATION = [
   {
     kind: 'header',
@@ -54,7 +52,8 @@ const NAVIGATION = [
     segment: 'logout',
     title: 'Logout',
     icon: <LogoutIcon />,
-  },
+  }
+ 
 ];
 
 const demoTheme = createTheme({
@@ -99,8 +98,7 @@ function DemoPageContent({ pathname }) {
         localStorage.removeItem('user');
         // Redirect to login page
         window.location.replace('/login');
-        return null; // Return null since this component redirects
-      };
+      }
       break;
     default:
       Component = () => (
@@ -127,111 +125,126 @@ function AppLayout(props) {
   const demoWindow = window !== undefined ? window() : undefined;
   const [showChat, setShowChat] = useState(false);
   const [messages, setMessages] = useState([]);
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3031';
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3031";
 
   const toggleChat = () => {
     setShowChat(!showChat);
   };
 
   const sendMessage = async () => {
-    const input = document.getElementById('userInput');
+    const input = document.getElementById("userInput");
     const message = input.value.trim();
     if (!message) return;
-    setMessages((prev) => [...prev, { sender: 'You', text: message }]);
-    input.value = '';
+    setMessages((prev) => [...prev, { sender: "You", text: message }]);
+    input.value = "";
 
     try {
       const res = await fetch(`${API_URL}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
       });
 
       const data = await res.json();
-      setMessages((prev) => [...prev, { sender: 'Bot', text: data.reply }]);
+      setMessages((prev) => [...prev, { sender: "Bot", text: data.reply }]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { sender: 'Bot', text: 'Error contacting chatbot server.' },
+        { sender: "Bot", text: "Error contacting chatbot server." },
       ]);
-      console.error('Chatbot error:', error);
+      console.error("Chatbot error:", error);
     }
   };
 
+  const handleLogout = () => {
+    // Clear user data from localStorage or sessionStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    // Redirect to login page
+    router.navigate('/login');
+  };
+
   return (
-    <AwsCredentialsProvider> {/* Wrap the app with AwsCredentialsProvider */}
-      <AppProvider
-        branding={{
-          logo: <img src={Logo} alt='Cloud secure' />,
-          title: 'CloudSecure',
-          homeUrl: '/',
-        }}
-        navigation={NAVIGATION}
-        router={router}
-        theme={demoTheme}
-        window={demoWindow}
+    <AppProvider
+      branding={{
+        logo: <img src={Logo} alt="Cloud secure" />,
+        title: 'CloudSecure',
+        homeUrl: '/',
+      }}
+      navigation={NAVIGATION}
+      router={router}
+      theme={demoTheme}
+      window={demoWindow}
+    >
+      
+      <DashboardLayout>
+        <DemoPageContent pathname={router.pathname} />
+      </DashboardLayout>
+      <>
+    {/* Floating Chatbot */}
+    <div
+    id="chatbot-toggle"
+    onClick={toggleChat}
+    style={{
+      position: "fixed",
+      bottom: "20px",
+      right: "20px",
+      color: "#1976d3",
+      cursor: "pointer"
+      // background: "#007bff",
+      // color: "white",
+      // padding: "10px",
+      // borderRadius: "50%",
+      // cursor: "pointer",
+      // zIndex: 1000,
+    }}
+  >
+    <SmartToyIcon fontSize={'large'}/>
+  </div>
+  {showChat && (
+    <div
+      id="chatbot-container"
+      style={{
+        position: "fixed",
+        bottom: "80px",
+        right: "20px",
+        width: "300px",
+        maxHeight: "400px",
+        background: "white",
+        border: "1px solid #ccc",
+        borderRadius: "10px",
+        overflow: "auto",
+        zIndex: 1000,
+        padding: "10px",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        id="chatbox"
+        style={{ height: "300px", overflowY: "scroll", marginBottom: "10px" }}
       >
-        <DashboardLayout>
-          <DemoPageContent pathname={router.pathname} />
-        </DashboardLayout>
-        <>
-          {/* Floating Chatbot */}
-          <div
-            id='chatbot-toggle'
-            onClick={toggleChat}
-            style={{
-              position: 'fixed',
-              bottom: '20px',
-              right: '20px',
-              color: '#1976d3',
-              cursor: 'pointer',
-            }}
-          >
-            <SmartToyIcon fontSize={'large'} />
+        {messages.map((msg, idx) => (
+          <div key={idx}>
+            <b>{msg.sender}:</b> {msg.text}
           </div>
-          {showChat && (
-            <div
-              id='chatbot-container'
-              style={{
-                position: 'fixed',
-                bottom: '80px',
-                right: '20px',
-                width: '300px',
-                maxHeight: '400px',
-                background: 'white',
-                border: '1px solid #ccc',
-                borderRadius: '10px',
-                overflow: 'auto',
-                zIndex: 1000,
-                padding: '10px',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <div
-                id='chatbox'
-                style={{ height: '300px', overflowY: 'scroll', marginBottom: '10px' }}
-              >
-                {messages.map((msg, idx) => (
-                  <div key={idx}>
-                    <b>{msg.sender}:</b> {msg.text}
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: '5px' }}>
-                <input
-                  type='text'
-                  id='userInput'
-                  placeholder='Ask something...'
-                  style={{ flex: 1 }}
-                />
-                <button onClick={sendMessage}>Send</button>
-              </div>
-            </div>
-          )}
-        </>
-      </AppProvider>
-    </AwsCredentialsProvider>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: "5px" }}>
+        <input
+          type="text"
+          id="userInput"
+          placeholder="Ask something..."
+          style={{ flex: 1 }}
+        />
+        <button onClick={sendMessage}>Send</button>
+      </div>
+    </div>
+  )}
+  </>
+    </AppProvider>
+  
+
   );
 }
 
