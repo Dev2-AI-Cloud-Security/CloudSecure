@@ -11,7 +11,7 @@ data "aws_vpc" "default" {
 # Fetch the default subnet in the default VPC
 data "aws_subnet" "default" {
   vpc_id            = data.aws_vpc.default.id
-  availability_zone = "us-east-1a" # Adjust if needed
+  availability_zone = "us-east-1a"
   default_for_az    = true
 }
 
@@ -48,7 +48,7 @@ resource "aws_instance" "cloudsecure" {
 
   # Set root volume to 10 GiB
   root_block_device {
-    volume_size           = 10 # GiB
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -63,7 +63,7 @@ resource "aws_instance" "cloudsecure" {
               # Resize partition and filesystem
               echo "Resizing partition..." > /home/ec2-user/resize.log 2>&1
               growpart /dev/xvda 1 >> /home/ec2-user/resize.log 2>&1 || echo "growpart failed" >> /home/ec2-user/resize.log
-              echo "Resizing filesystem..." >> /home/ec2-user/resize.log 2>&1
+              echo "Resizing filesystem..." > /home/ec2-user/resize.log 2>&1
               xfs_growfs / >> /home/ec2-user/resize.log 2>&1 || echo "xfs_growfs failed" >> /home/ec2-user/resize.log
               df -h / >> /home/ec2-user/resize.log 2>&1
               # Ensure the log is readable
@@ -71,7 +71,7 @@ resource "aws_instance" "cloudsecure" {
               EOF
 
   tags = {
-    Name = "cloudsecure-instance-${timestamp()}" # Unique tag to force recreation
+    Name = "cloudsecure-instance-${timestamp()}"
   }
 
   lifecycle {
