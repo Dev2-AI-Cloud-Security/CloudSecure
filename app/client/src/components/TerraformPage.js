@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import Layout from './TerraformLayout';
 import TerraformForm from './TerraformForm';
 import { api } from '../config/api';
-import { Box, Typography, Button, CircularProgress } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, Backdrop } from '@mui/material';
 
 function TerraformPage() {
   const [ec2Instances, setEc2Instances] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false); // Track delete operation
   const [error, setError] = useState(null);
 
   // Get user ID from localStorage
@@ -39,7 +40,8 @@ function TerraformPage() {
     fetchEc2Instances();
   }, [userId]); // Use userId as the dependency instead of the entire user object
 
-  const handleDeleteInstance = async (instanceId) => {
+  const handleDeleteInstance = async () => {
+    setIsDeleting(true); // Show progress circle
     try {
       const response = await fetch('http://localhost:3031/api/delete-ec2-instance', {
         method: 'POST',
@@ -50,16 +52,18 @@ function TerraformPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete EC2 instance.');
+        throw new Error('Failed to delete EC2 instances.');
       }
 
       const data = await response.json();
       console.log(data.message);
 
-      // Remove the instance from the state
-      setEc2Instances((prev) => prev.filter((instance) => instance.instanceId !== instanceId));
+      // Clear all instances from the state
+      setEc2Instances([]);
     } catch (err) {
-      console.error('Error deleting EC2 instance:', err.message);
+      console.error('Error deleting EC2 instances:', err.message);
+    } finally {
+      setIsDeleting(false); // Hide progress circle
     }
   };
 
@@ -92,6 +96,11 @@ function TerraformPage() {
 
   return (
     <Layout>
+      {/* Backdrop for delete operation */}
+      <Backdrop open={isDeleting} sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+        <CircularProgress color="inherit" />
+      </Backdrop>
+
       {ec2Instances.length === 0 ? (
         // Display Terraform configuration form if no EC2 instances are present
         <TerraformForm onSubmit={handleAddInstance} />
@@ -107,17 +116,18 @@ function TerraformPage() {
                 <Typography variant="body1">
                   Instance ID: {instance.instanceId}, Name: {instance.name}
                 </Typography>
-                <Button
-                  variant="contained"
-                  color="error"
-                  onClick={() => handleDeleteInstance(instance.instanceId)}
-                  sx={{ mt: 1 }}
-                >
-                  Delete Instance
-                </Button>
               </li>
             ))}
           </ul>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteInstance}
+            sx={{ mt: 2 }}
+            disabled={isDeleting} // Disable button while deleting
+          >
+            Delete All Instances
+          </Button>
         </Box>
       )}
     </Layout>

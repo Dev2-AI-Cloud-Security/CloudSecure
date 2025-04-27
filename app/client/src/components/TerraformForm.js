@@ -1,6 +1,8 @@
 // src/components/TerraformForm.js
 import { useState } from 'react';
 import { saveAs } from 'file-saver';
+import { Backdrop } from '@mui/material'; // Import Backdrop
+
 
 import {
   Card,
@@ -186,6 +188,9 @@ resource "aws_s3_bucket" "my_bucket" {
 
   return (
     <div>
+      <Backdrop open={isDeploying} sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+        <CircularProgress color="inherit" />
+      </Backdrop>
       <Typography variant="h4" gutterBottom>
         Infrastructure Deployment
       </Typography>
