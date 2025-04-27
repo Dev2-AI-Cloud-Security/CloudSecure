@@ -15,6 +15,26 @@ function TerraformPage() {
   const user = JSON.parse(localStorage.getItem('user')); // Parse user details from localStorage
   const userId = user?.id; // Extract user ID
 
+  // Fetch EC2 instances from the backend
+  const fetchEc2Instances = async () => {
+    setLoading(true);
+    try{
+      const ec2Data = await api.getEc2Instances(user.id)
+
+      if (!ec2Data || ec2Data.length === 0) {
+        console.log('No EC2 instances found for the user:', user.id);
+        setEc2Instances([]); // No instances found
+      } else {
+        setEc2Instances(ec2Data);
+      } // Update state with fetched instances
+    } catch (err) {
+      console.error('Error fetching EC2 instances:', err.message);
+      setError(err.message || 'Failed to fetch EC2 instances.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const fetchAwsCredentials = async () => {
       if (!userId) {
@@ -42,6 +62,7 @@ function TerraformPage() {
 
         if (awsAccessKeyId && awsSecretAccessKey) {
           setAwsCredentialsSet(true); // AWS credentials are set
+          await fetchEc2Instances(); // Fetch EC2 instances after verifying credentials
         } else {
           setAwsCredentialsSet(false); // AWS credentials are missing
         }
@@ -74,8 +95,8 @@ function TerraformPage() {
       const data = await response.json();
       console.log(data.message);
 
-      // Clear all instances from the state
-      setEc2Instances([]);
+      // Fetch updated EC2 instances after deletion
+      await fetchEc2Instances();
     } catch (err) {
       console.error('Error deleting EC2 instances:', err.message);
     } finally {
@@ -86,7 +107,10 @@ function TerraformPage() {
   const handleAddInstance = async (instanceConfig) => {
     try {
       const newInstance = await api.addEc2Instance(userId, instanceConfig); // Call API to add the instance
-      setEc2Instances((prev) => [...prev, newInstance]); // Update state with the new instance
+      console.log('New EC2 instance added:', newInstance); // Debug log
+
+      // Fetch updated EC2 instances after adding a new instance
+      await fetchEc2Instances();
     } catch (err) {
       console.error('Failed to add EC2 instance:', err.message);
     }
@@ -129,7 +153,6 @@ function TerraformPage() {
       <Backdrop open={isDeleting} sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <CircularProgress color="inherit" />
       </Backdrop>
-
       {ec2Instances.length === 0 ? (
         // Display Terraform configuration form if no EC2 instances are present
         <TerraformForm onSubmit={handleAddInstance} />
