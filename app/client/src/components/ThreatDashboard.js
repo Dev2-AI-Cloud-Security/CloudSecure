@@ -25,30 +25,27 @@ const ThreatDashboard = () => {
 
       try {
         // Fetch EC2 Instances
-        const ec2Response = await fetch(`http://localhost:3031/api/ec2-instances?userId=${userId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        const ec2Data = await api.getEc2Instances(user.id);
 
-        if (!ec2Response.ok) {
-          throw new Error('Failed to fetch EC2 instances');
+        if (!ec2Data || ec2Data.length === 0) {
+          console.log('No EC2 instances found for the user:', user.id);
+          setEc2Instances([]); // No instances found
+        } else {
+          // Process EC2 Instances
+        
+          console.log('EC2 Instances:', ec2Data);
+          setEc2Instances(ec2Data);
+
+          // Fetch Threat Data
+          const threatResponse = await api.getThreats();
+          console.log('Threat Data:', threatResponse);
+          setThreatData(threatResponse);
+
+          // Fetch Log Events
+          const logResponse = await api.getAlerts();
+          console.log('Log Events:', logResponse);
+          setLogEvents(logResponse);
         }
-
-        const ec2Data = await ec2Response.json();
-        console.log('EC2 Instances:', ec2Data);
-        setEc2Instances(ec2Data);
-
-        // Fetch Threat Data
-        const threatResponse = await api.getThreats();
-        console.log('Threat Data:', threatResponse);
-        setThreatData(threatResponse);
-
-        // Fetch Log Events
-        const logResponse = await api.getAlerts();
-        console.log('Log Events:', logResponse);
-        setLogEvents(logResponse);
       } catch (error) {
         console.error('Error fetching data:', error);
         setError('Failed to fetch data.');

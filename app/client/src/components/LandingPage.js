@@ -29,20 +29,20 @@ function LandingPage() {
 
       try {
         // Fetch all data in parallel
-        const [ec2Data, threatsData, resolvedIssuesData, riskLevelsData, alertsData] = await Promise.all([
-          api.getEc2Instances(user.id),
-          api.getThreats(),
-          api.getResolvedIssues(),
-          api.getRiskLevels(),
-          api.getAlerts(),
-        ]);
+        const ec2Data = await api.getEc2Instances(user.id)
+       
 
         // Process EC2 Instances
-        if (ec2Data.message) {
+        if (!ec2Data || ec2Data.length === 0) {
+          console.log('No EC2 instances found for the user:', user.id);
           setEc2Instances([]); // No instances found
         } else {
-          setEc2Instances(ec2Data);
-        }
+          const [threatsData, resolvedIssuesData, riskLevelsData, alertsData] = await Promise.all([
+            api.getThreats(),
+            api.getResolvedIssues(),
+            api.getRiskLevels(),
+            api.getAlerts(),
+          ]);
 
         // Process Threats
         setThreats(
@@ -75,8 +75,11 @@ function LandingPage() {
             status: alert.status,
           }))
         );
+          setEc2Instances(ec2Data);
+        }
+
       } catch (err) {
-        console.error('Error fetching data:', err.message);
+        console.error('Error fetching data:', err);
         setError('Failed to fetch data.');
       } finally {
         setLoading(false);
