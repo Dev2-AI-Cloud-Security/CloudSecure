@@ -84,7 +84,7 @@ function LandingPage() {
     };
 
     fetchData();
-  }, [token, user]);
+  }, []);
 
   if (loading) {
     return (

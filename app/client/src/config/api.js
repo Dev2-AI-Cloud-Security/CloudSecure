@@ -61,4 +61,6 @@ export const api = {
     createApiRequest(`/api/ec2-instances/${instanceId}`, 'DELETE'),
   addEc2Instance: (userId, instanceConfig) =>
     createApiRequest(`/api/ec2-instances?userId=${userId}`, 'POST', instanceConfig),
+  initializeCloudWatch: (options = {}) =>
+    createApiRequest(`/api/initialize-cloudwatch`, 'POST', options)
 };

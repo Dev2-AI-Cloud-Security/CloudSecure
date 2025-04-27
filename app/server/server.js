@@ -208,9 +208,9 @@ const generateDummyLogs = async () => {
         logEvents,
       })
       .promise();
-    console.log('Dummy logs sent to CloudWatch');
+    console.log('Simulated logs sent to CloudWatch');
   } catch (error) {
-    console.error('Error sending dummy logs:', error);
+    console.error('Error sending Simulated logs:', error);
   }
 };
 
@@ -219,8 +219,15 @@ const initializeCloudWatch = async () => {
   await setupLogGroupAndStream();
   await generateDummyLogs();
 };
-initializeCloudWatch();
-
+app.post('/api/initialize-cloudwatch', async (req, res) => {
+  try {
+    await initializeCloudWatch();
+    res.status(200).json({ message: 'CloudWatch Logs initialized successfully' });
+  } catch (error) {
+    console.error('Error initializing CloudWatch Logs:', error.message);
+    res.status(500).json({ error: 'Failed to initialize CloudWatch Logs' });
+  }
+});
 // Middleware to Verify JWT
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];

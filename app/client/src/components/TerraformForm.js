@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { saveAs } from 'file-saver';
 import { Backdrop } from '@mui/material'; // Import Backdrop
-
+import { api } from '../config/api';
 
 import {
   Card,
@@ -186,7 +186,7 @@ resource "aws_s3_bucket" "my_bucket" {
           ami,
           state: 'running', // Add the `state` field
         };
-
+        await api.initializeCloudWatch();
         const saveResponse = await fetch(`http://localhost:3031/api/ec2-instances?userId=${user.id}`, {
           method: 'POST',
           headers: {
