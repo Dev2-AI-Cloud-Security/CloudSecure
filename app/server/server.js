@@ -1015,7 +1015,7 @@ app.get('/api/stats', async (req, res) => {
  *         description: Failed to update user details
  */
 app.post('/api/user/update', async (req, res) => {
-  const { userId, password, address, contactDetails } = req.body;
+  const { userId, password, address, contactDetails, awsAccessKeyId, awsSecretAccessKey } = req.body;
 
   if (!userId) {
     return res.status(400).json({ message: 'User ID is required.' });
@@ -1035,6 +1035,14 @@ app.post('/api/user/update', async (req, res) => {
 
     if (contactDetails) {
       updates.contactDetails = contactDetails;
+    }
+
+    if (awsAccessKeyId) {
+      updates.awsAccessKeyId = awsAccessKeyId;
+    }
+
+    if (awsSecretAccessKey) {
+      updates.awsSecretAccessKey = awsSecretAccessKey;
     }
 
     if (Object.keys(updates).length === 0) {

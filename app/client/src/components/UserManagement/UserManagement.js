@@ -13,6 +13,8 @@ const UserManagement = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [address, setAddress] = useState('');
   const [contactDetails, setContactDetails] = useState('');
+  const [awsAccessKeyId, setAwsAccessKeyId] = useState(''); // AWS Access Key ID
+  const [awsSecretAccessKey, setAwsSecretAccessKey] = useState(''); // AWS Secret Access Key
   const [isGoogleLogin, setIsGoogleLogin] = useState(false);
 
   useEffect(() => {
@@ -43,6 +45,8 @@ const UserManagement = () => {
         const data = await response.json();
         setAddress(data.address || ''); // Populate address field
         setContactDetails(data.contactDetails || ''); // Populate contact details field
+        setAwsAccessKeyId(data.awsAccessKeyId || ''); // Populate AWS Access Key ID
+        setAwsSecretAccessKey(data.awsSecretAccessKey || '');
         setIsGoogleLogin(data.isGoogleLogin || false); // Set Google login status
       } catch (error) {
         console.error('Error fetching user details:', error);
@@ -70,6 +74,14 @@ const UserManagement = () => {
 
     if (contactDetails) {
       updates.contactDetails = contactDetails;
+    }
+
+    if (awsAccessKeyId) {
+      updates.awsAccessKeyId = awsAccessKeyId;
+    }
+
+    if (awsSecretAccessKey) {
+      updates.awsSecretAccessKey = awsSecretAccessKey;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -202,6 +214,21 @@ const UserManagement = () => {
         value={contactDetails}
         onChange={(e) => setContactDetails(e.target.value)}
       />
+
+      {/* AWS Credentials Section */}
+            <Typography variant="h6">AWS Credentials</Typography>
+            <TextField
+              label="AWS Access Key ID"
+              fullWidth
+              value={awsAccessKeyId}
+              onChange={(e) => setAwsAccessKeyId(e.target.value)}
+            />
+            <TextField
+              label="AWS Secret Access Key"
+              fullWidth
+              value={awsSecretAccessKey}
+              onChange={(e) => setAwsSecretAccessKey(e.target.value)}
+            />
 
       <Button variant="contained" color="primary" onClick={handleUpdateUserDetails}>
         Save Changes

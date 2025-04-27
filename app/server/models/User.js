@@ -37,11 +37,19 @@ const userSchema = new mongoose.Schema({
     default: false,
   },
   address: {
-    type: String, // Address field added
+    type: String,
     required: false,
   },
   contactDetails: {
-    type: String, // Contact details field added
+    type: String,
+    required: false,
+  },
+  awsAccessKeyId: {
+    type: String, // AWS Access Key ID
+    required: false,
+  },
+  awsSecretAccessKey: {
+    type: String, // AWS Secret Access Key
     required: false,
   },
   ec2Instances: [ec2InstanceSchema], // Embed EC2 instances as an array
