@@ -2,20 +2,21 @@ import React, { useState, useEffect } from 'react';
 import Layout from './TerraformLayout';
 import TerraformForm from './TerraformForm';
 import { api } from '../config/api';
-import { Box, Typography, Button, CircularProgress, Backdrop } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, Backdrop, Alert } from '@mui/material';
 
 function TerraformPage() {
   const [ec2Instances, setEc2Instances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false); // Track delete operation
   const [error, setError] = useState(null);
+  const [awsCredentialsSet, setAwsCredentialsSet] = useState(false); // Track AWS credentials
 
   // Get user ID from localStorage
   const user = JSON.parse(localStorage.getItem('user')); // Parse user details from localStorage
   const userId = user?.id; // Extract user ID
 
   useEffect(() => {
-    const fetchEc2Instances = async () => {
+    const fetchAwsCredentials = async () => {
       if (!userId) {
         console.error('User ID is missing or invalid:', userId); // Debug log
         setError('User ID is missing or invalid.');
@@ -24,21 +25,36 @@ function TerraformPage() {
       }
 
       try {
-        const response = await api.getEc2Instances(userId); // Fetch EC2 instances
-        if (response.message) {
-          setEc2Instances([]); // No instances found
+        const response = await fetch(`http://localhost:3031/api/user/${userId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to fetch AWS credentials.');
+        }
+
+        const userData = await response.json();
+        const { awsAccessKeyId, awsSecretAccessKey } = userData;
+
+        if (awsAccessKeyId && awsSecretAccessKey) {
+          setAwsCredentialsSet(true); // AWS credentials are set
         } else {
-          setEc2Instances(response);
+          setAwsCredentialsSet(false); // AWS credentials are missing
         }
       } catch (err) {
-        setError('Failed to fetch EC2 instances: ' + err.message);
+        console.error('Error fetching AWS credentials:', err.message);
+        setAwsCredentialsSet(false); // Assume credentials are missing on error
       } finally {
         setLoading(false);
       }
     };
 
-    fetchEc2Instances();
-  }, [userId]); // Use userId as the dependency instead of the entire user object
+    fetchAwsCredentials();
+  }, [userId]);
 
   const handleDeleteInstance = async () => {
     setIsDeleting(true); // Show progress circle
@@ -80,6 +96,19 @@ function TerraformPage() {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!awsCredentialsSet) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          AWS credentials are missing. Please set your AWS credentials in the User Management section.
+        </Alert>
+        <Typography variant="body1">
+          Navigate to the <strong>User Management</strong> page to add your AWS credentials.
+        </Typography>
       </Box>
     );
   }
