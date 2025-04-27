@@ -806,7 +806,6 @@ app.get('/api/ec2-instances', async (req, res) => {
   try {
     const userId = req.query.userId;
 
-    // Validate userId
     if (!mongoose.isValidObjectId(userId)) {
       return res.status(400).json({ message: 'Invalid user ID format' });
     }
@@ -818,7 +817,7 @@ app.get('/api/ec2-instances', async (req, res) => {
     }
 
     if (!user.ec2Instances || user.ec2Instances.length === 0) {
-      return res.status(200).json({ message: 'No EC2 instances found for this user' });
+      return res.status(200).json([]); // Return an empty array if no instances are found
     }
 
     res.status(200).json(user.ec2Instances);

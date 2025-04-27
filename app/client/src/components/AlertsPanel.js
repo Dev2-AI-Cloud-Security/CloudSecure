@@ -1,29 +1,36 @@
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography } from '@mui/material';
+import React from 'react';
+import { Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
 const AlertsPanel = ({ alerts }) => {
+  if (!alerts || alerts.length === 0) {
+    return (
+      <Typography variant="body1" color="textSecondary">
+        No alerts available.
+      </Typography>
+    );
+  }
+
   return (
     <div>
       <Typography variant="h6" gutterBottom>
         Alerts Panel
       </Typography>
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Incident</TableCell>
-              <TableCell>Details</TableCell>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Incident</TableCell>
+            <TableCell>Status</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {alerts.map((alert, index) => (
+            <TableRow key={index}>
+              <TableCell>{alert.incident}</TableCell>
+              <TableCell>{alert.status}</TableCell>
             </TableRow>
-          </TableHead>
-          <TableBody>
-            {alerts.map(alert => (
-              <TableRow key={alert.id}>
-                <TableCell>{alert.message}</TableCell>
-                <TableCell>{alert.details}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 };

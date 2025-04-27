@@ -16,40 +16,49 @@ const ThreatDashboard = () => {
   const userId = user?.id; // Extract userId
 
   useEffect(() => {
-    let intervalId;
+    const fetchData = async () => {
+      if (!userId) {
+        setError('User ID is missing or invalid.');
+        setLoading(false);
+        return;
+      }
 
-    const fetchEc2Instances = async () => {
       try {
-        const response = await fetch(`http://localhost:3031/api/ec2-instances?userId=${userId}`, {
+        // Fetch EC2 Instances
+        const ec2Response = await fetch(`http://localhost:3031/api/ec2-instances?userId=${userId}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`, // Include token if required
           },
         });
 
-        if (!response.ok) {
+        if (!ec2Response.ok) {
           throw new Error('Failed to fetch EC2 instances');
         }
 
-        const data = await response.json();
-        console.log('EC2 Instances:', data);
+        const ec2Data = await ec2Response.json();
+        console.log('EC2 Instances:', ec2Data);
+        setEc2Instances(ec2Data);
+
+        // Fetch Threat Data
+        const threatResponse = await api.getThreats();
+        console.log('Threat Data:', threatResponse);
+        setThreatData(threatResponse);
+
+        // Fetch Log Events
+        const logResponse = await api.getAlerts();
+        console.log('Log Events:', logResponse);
+        setLogEvents(logResponse);
       } catch (error) {
-        console.error('Error fetching EC2 instances:', error);
+        console.error('Error fetching data:', error);
+        setError('Failed to fetch data.');
       } finally {
         setLoading(false);
       }
     };
 
-    // Fetch EC2 instances immediately
-    fetchEc2Instances();
-
-    // Set up polling every 30 seconds
-    intervalId = setInterval(fetchEc2Instances, 30000);
-
-    // Cleanup interval on component unmount
-    return () => clearInterval(intervalId);
-  }, []); // Empty dependency array ensures this runs only once on mount
+    fetchData();
+  }, [userId]);
 
   if (loading) {
     return (

@@ -11,78 +11,98 @@ function LandingPage() {
   const [riskLevels, setRiskLevels] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [ec2Instances, setEc2Instances] = useState([]);
-  const [loadingInstances, setLoadingInstances] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Get token and user from localStorage
   const token = localStorage.getItem('token');
   const user = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
-    if (token && user) {
-      if (!user.id || user.id.length !== 24) {
-        console.error('Invalid user ID format:', user?.id);
+    const fetchData = async () => {
+      if (!token || !user || !user.id || user.id.length !== 24) {
+        console.error('Invalid token or user ID format:', user?.id);
+        setError('Invalid token or user ID format.');
+        setLoading(false);
         return;
       }
 
-      // Fetch EC2 Instances
-      api.getEc2Instances(user.id)
-        .then(data => {
-          if (data.message) {
-            setEc2Instances([]); // No instances found
-          } else {
-            setEc2Instances(data);
-          }
-        })
-        .catch(err => console.error('Error fetching EC2 instances:', err))
-        .finally(() => setLoadingInstances(false));
+      try {
+        // Fetch all data in parallel
+        const [ec2Data, threatsData, resolvedIssuesData, riskLevelsData, alertsData] = await Promise.all([
+          api.getEc2Instances(user.id),
+          api.getThreats(),
+          api.getResolvedIssues(),
+          api.getRiskLevels(),
+          api.getAlerts(),
+        ]);
 
-      // Fetch Threats
-      api.getThreats()
-        .then(data => {
-          setThreats(data.map(item => ({
+        // Process EC2 Instances
+        if (ec2Data.message) {
+          setEc2Instances([]); // No instances found
+        } else {
+          setEc2Instances(ec2Data);
+        }
+
+        // Process Threats
+        setThreats(
+          threatsData.map((item) => ({
             timestamp: new Date(item.timestamp).toLocaleTimeString(),
             count: item.count,
-          })));
-        })
-        .catch(err => console.error('Error fetching threats:', err));
+          }))
+        );
 
-      // Fetch Resolved Issues
-      api.getResolvedIssues()
-        .then(data => {
-          setResolvedIssues(data.map((item, index) => ({
+        // Process Resolved Issues
+        setResolvedIssues(
+          resolvedIssuesData.map((item, index) => ({
             name: `Q${index + 1}`,
             resolved: item.count,
-          })));
-        })
-        .catch(err => console.error('Error fetching resolved issues:', err));
+          }))
+        );
 
-      // Fetch Risk Levels
-      api.getRiskLevels()
-        .then(data => {
-          setRiskLevels(data.map(item => ({
+        // Process Risk Levels
+        setRiskLevels(
+          riskLevelsData.map((item) => ({
             name: item.level,
             value: item.count,
-          })));
-        })
-        .catch(err => console.error('Error fetching risk levels:', err));
-    } else {
-      console.error('Token or user is missing.');
-    }
-  }, [token, user]);
+          }))
+        );
 
-  useEffect(() => {
-    const fetchAlerts = async () => {
-      try {
-        const response = await api.getAlerts(token);
-        setAlerts(response);
+        // Process Alerts
+        setAlerts(
+          alertsData.map((alert) => ({
+            incident: alert.incident,
+            status: alert.status,
+          }))
+        );
       } catch (err) {
-        console.error('Error fetching alerts:', err.message);
+        console.error('Error fetching data:', err.message);
+        setError('Failed to fetch data.');
+      } finally {
+        setLoading(false);
       }
     };
 
-    const interval = setInterval(fetchAlerts, 60000); // Fetch alerts every 60 seconds
-    return () => clearInterval(interval); // Cleanup on component unmount
-  }, [token]);
+    fetchData();
+  }, [token, user]);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Typography variant="h6">Loading...</Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography variant="h6" color="error">
+          {error}
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <div>
@@ -102,11 +122,7 @@ function LandingPage() {
               <Typography variant="h6" gutterBottom>
                 EC2 Instances
               </Typography>
-              {loadingInstances ? (
-                <Typography variant="body1" color="textSecondary">
-                  Loading EC2 instances...
-                </Typography>
-              ) : ec2Instances.length === 0 ? (
+              {ec2Instances.length === 0 ? (
                 <Typography variant="body1" color="textSecondary">
                   No EC2 instances found. Add a new instance from the Infrastructure page.
                 </Typography>
@@ -130,7 +146,7 @@ function LandingPage() {
                     <AlertsPanel alerts={alerts} />
                   </Box>
                   <Box>
-                    <ThreatInsights />
+                    <ThreatInsights data={threats} />
                   </Box>
                 </>
               )}

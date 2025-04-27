@@ -9,20 +9,21 @@ function TerraformPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Get user from localStorage
+  // Get user ID from localStorage
   const user = JSON.parse(localStorage.getItem('user')); // Parse user details from localStorage
+  const userId = user?.id; // Extract user ID
 
   useEffect(() => {
     const fetchEc2Instances = async () => {
-      if (!user || !user.id) {
-        console.error('User ID is missing or invalid:', user); // Debug log
+      if (!userId) {
+        console.error('User ID is missing or invalid:', userId); // Debug log
         setError('User ID is missing or invalid.');
         setLoading(false);
         return;
       }
 
       try {
-        const response = await api.getEc2Instances(user.id); // Fetch EC2 instances
+        const response = await api.getEc2Instances(userId); // Fetch EC2 instances
         if (response.message) {
           setEc2Instances([]); // No instances found
         } else {
@@ -36,7 +37,7 @@ function TerraformPage() {
     };
 
     fetchEc2Instances();
-  }, [user]);
+  }, [userId]); // Use userId as the dependency instead of the entire user object
 
   const handleDeleteInstance = async (instanceId) => {
     try {
@@ -49,7 +50,7 @@ function TerraformPage() {
 
   const handleAddInstance = async (instanceConfig) => {
     try {
-      const newInstance = await api.addEc2Instance(user.id, instanceConfig); // Call API to add the instance
+      const newInstance = await api.addEc2Instance(userId, instanceConfig); // Call API to add the instance
       setEc2Instances((prev) => [...prev, newInstance]); // Update state with the new instance
     } catch (err) {
       console.error('Failed to add EC2 instance:', err.message);
