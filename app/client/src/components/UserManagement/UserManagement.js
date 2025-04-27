@@ -108,12 +108,45 @@ const UserManagement = () => {
     }
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
     const confirmDelete = window.confirm(
       'Are you sure you want to delete your account? This action cannot be undone.'
     );
-    if (confirmDelete) {
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user')); // Get user details from localStorage
+      const userId = user?.id; // Extract userId
+
+      if (!userId) {
+        alert('User ID is missing. Please log in again.');
+        return;
+      }
+
+      const response = await fetch('http://localhost:3031/api/user/delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`, // Include token for authentication
+        },
+        body: JSON.stringify({ userId }), // Send userId in the request body
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete account.');
+      }
+
       alert('Account deleted successfully!');
+      localStorage.clear(); // Clear localStorage
+      window.location.href = '/login'; // Redirect to login page
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      alert(error.message || 'Failed to delete account.');
     }
   };
 

@@ -1075,6 +1075,38 @@ app.get('/api/user/:userId', async (req, res) => {
   }
 });
 
+app.delete('/api/user/delete', async (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required.' });
+  }
+
+  try {
+    // Find the user by ID
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    // Check if the user has any active EC2 instances
+    if (user.ec2Instances && user.ec2Instances.length > 0) {
+      return res.status(400).json({
+        message: 'Cannot delete account. Please terminate all EC2 instances before deleting your account.',
+      });
+    }
+
+    // Delete the user
+    await User.findByIdAndDelete(userId);
+
+    res.status(200).json({ message: 'User deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Failed to delete user.' });
+  }
+});
+
 // Start Server
 const PORT = process.env.PORT || 3031;
 app.listen(PORT, () => {
