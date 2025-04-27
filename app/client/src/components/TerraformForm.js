@@ -96,15 +96,25 @@ resource "aws_s3_bucket" "my_bucket" {
 
     setTerraformConfig(config);
     setOpenSnackbar(true);
+
     try {
+      const user = JSON.parse(localStorage.getItem('user')); // Get user from localStorage
+      if (!user || !user.id) {
+        alert('User ID is missing. Cannot save Terraform configuration.');
+        return;
+      }
+
       const response = await fetch('http://localhost:3031/save-terraform-config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ config }),
+        body: JSON.stringify({
+          userId: user.id, // Include userId in the request
+          config,
+        }),
       });
-   
+
       if (response.ok) {
         alert('Terraform configuration saved on the server successfully!');
       } else {
@@ -119,8 +129,21 @@ resource "aws_s3_bucket" "my_bucket" {
   const handleDeploy = async () => {
     setIsDeploying(true);
     try {
+      const user = JSON.parse(localStorage.getItem('user')); // Get user from localStorage
+      if (!user || !user.id) {
+        alert('User ID is missing. Cannot deploy Terraform configuration.');
+        setIsDeploying(false);
+        return;
+      }
+
       const response = await fetch('http://localhost:3031/deploy', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id, // Pass userId in the request body
+        }),
       });
 
       if (response.ok) {
@@ -137,23 +160,18 @@ resource "aws_s3_bucket" "my_bucket" {
           state: 'running', // Add the `state` field
         };
 
-        const user = JSON.parse(localStorage.getItem('user')); // Get user from localStorage
-        if (user && user.id) {
-          const saveResponse = await fetch(`http://localhost:3031/api/ec2-instances?userId=${user.id}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(ec2Config),
-          });
+        const saveResponse = await fetch(`http://localhost:3031/api/ec2-instances?userId=${user.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(ec2Config),
+        });
 
-          if (saveResponse.ok) {
-            alert('EC2 configuration saved to the user database successfully!');
-          } else {
-            alert('Failed to save EC2 configuration to the user database.');
-          }
+        if (saveResponse.ok) {
+          alert('EC2 configuration saved to the user database successfully!');
         } else {
-          alert('User not found. Cannot save EC2 configuration.');
+          alert('Failed to save EC2 configuration to the user database.');
         }
       } else {
         alert('Failed to deploy Terraform configuration.');

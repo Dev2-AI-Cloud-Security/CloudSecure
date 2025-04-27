@@ -737,21 +737,31 @@ app.get('/api/alerts', async (req, res) => {
  *       500:
  *         description: Failed to save configuration
  */
-app.post('/save-terraform-config', (req, res) => {
-  const { config } = req.body;
+app.post('/save-terraform-config', async (req, res) => {
+  const { userId, config } = req.body;
 
-  if (!config) {
-    return res.status(400).send('No configuration provided.');
+  if (!userId || !config) {
+    return res.status(400).json({ message: 'User ID and Terraform configuration are required.' });
   }
 
-  const filePath = path.join(__dirname, 'terraform-config.tf');
-  fs.writeFile(filePath, config, (err) => {
-    if (err) {
-      console.error('Error saving Terraform config:', err);
-      return res.status(500).send('Failed to save configuration.');
+  try {
+    // Create a hidden Terraform directory for the user
+    const terraformDir = path.join(__dirname, `.terraform-user-${userId}`);
+    if (!fs.existsSync(terraformDir)) {
+      fs.mkdirSync(terraformDir, { recursive: true });
+      console.log(`Created Terraform directory for user: ${terraformDir}`);
     }
-    res.send('Terraform configuration saved successfully.');
-  });
+
+    // Save the Terraform configuration to a file
+    const configFilePath = path.join(terraformDir, 'main.tf');
+    fs.writeFileSync(configFilePath, config);
+    console.log(`Terraform configuration saved to: ${configFilePath}`);
+
+    res.status(200).json({ message: 'Terraform configuration saved successfully.' });
+  } catch (error) {
+    console.error('Error saving Terraform configuration:', error);
+    res.status(500).json({ message: 'Failed to save Terraform configuration.' });
+  }
 });
 
 
@@ -773,7 +783,15 @@ const { exec } = require('child_process');
  *         description: Failed to deploy resources
  */
 app.post('/deploy', async (req, res) => {
-  const terraformFilePath = path.join(__dirname, 'terraform-config.tf');
+
+  const { userId } = req.body;
+  const terraformDir = path.join(__dirname, '.terraform-user-' + userId);
+  const terraformFileName = 'main.tf';
+  const terraformFilePath = path.join(terraformDir, terraformFileName); 
+
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required.' });
+  }
 
   // Check if the Terraform file exists
   if (!fs.existsSync(terraformFilePath)) {
@@ -782,7 +800,7 @@ app.post('/deploy', async (req, res) => {
 
   try {
     // Run Terraform commands
-    exec(`terraform init && terraform apply -auto-approve`, { cwd: __dirname }, (error, stdout, stderr) => {
+    exec(`cd ${terraformDir} && terraform init && terraform apply -auto-approve`, (error, stdout, stderr) => {
       if (error) {
         console.error('Error running Terraform:', error.message);
         return res.status(500).send('Failed to deploy resources.');
@@ -872,6 +890,50 @@ app.post('/api/ec2-instances', async (req, res) => {
   } catch (error) {
     console.error('Error adding EC2 instance:', error);
     res.status(500).json({ error: 'Failed to add EC2 instance' });
+  }
+});
+
+app.post('/api/delete-ec2-instance', async (req, res) => {
+
+  const { userId } = req.body;
+  
+  try {
+    // Path to the Terraform configuration directory
+    const terraformDir = path.join(__dirname, `.terraform-user-${userId}`);
+
+    // Run Terraform commands to delete the instance
+    exec(
+      `cd ${terraformDir} && terraform destroy -auto-approve -lock=false`,
+      async (error, stdout, stderr) => {
+        if (error) {
+          console.error('Error executing Terraform:', error);
+          return res.status(500).json({ message: 'Failed to delete EC2 instance.' });
+        }
+
+        console.log('Terraform Output:', stdout);
+        try {
+          // Clear all EC2 instances for the user
+          const user = await User.findByIdAndUpdate(
+            userId,
+            { $set: { ec2Instances: [] } }, // Clear the ec2Instances array
+            { new: true }
+          );
+      
+          if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+          }
+      
+          console.log(`All EC2 instances cleared for user ${userId}.`);
+          } catch (error) {
+            console.error('Error clearing EC2 instances:', error);
+            res.status(500).json({ message: 'Failed to delete EC2 instances.' });
+          }
+          res.status(200).json({ message: 'EC2 instance deleted successfully.' });
+      }
+    );
+  } catch (error) {
+    console.error('Error deleting EC2 instance:', error);
+    res.status(500).json({ message: 'Failed to delete EC2 instance.' });
   }
 });
 

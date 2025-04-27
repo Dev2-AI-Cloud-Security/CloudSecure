@@ -100,7 +100,7 @@ const ThreatDashboard = () => {
                   {ec2Instances.map((instance, index) => (
                     <li key={index}>
                       <Typography variant="body1">
-                        Instance ID: {instance.instanceId}, Name: {instance.name}
+                        Instance ID: "{instance.instanceId}", Name: {instance.name}
                       </Typography>
                     </li>
                   ))}

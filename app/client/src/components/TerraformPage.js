@@ -41,10 +41,25 @@ function TerraformPage() {
 
   const handleDeleteInstance = async (instanceId) => {
     try {
-      await api.deleteEc2Instance(instanceId); // Call API to delete the instance
-      setEc2Instances((prev) => prev.filter((instance) => instance.instanceId !== instanceId)); // Update state
+      const response = await fetch('http://localhost:3031/api/delete-ec2-instance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete EC2 instance.');
+      }
+
+      const data = await response.json();
+      console.log(data.message);
+
+      // Remove the instance from the state
+      setEc2Instances((prev) => prev.filter((instance) => instance.instanceId !== instanceId));
     } catch (err) {
-      console.error('Failed to delete EC2 instance:', err.message);
+      console.error('Error deleting EC2 instance:', err.message);
     }
   };
 
