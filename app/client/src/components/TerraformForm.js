@@ -67,9 +67,40 @@ const TerraformForm = () => {
   const generateTerraformConfig = async () => {
     const { region, instanceType, ami, instanceName, s3BucketName, createS3 } = formData;
 
+try {
+      const user = JSON.parse(localStorage.getItem('user')); // Get user from localStorage
+      if (!user || !user.id) {
+        alert('User ID is missing. Cannot generate Terraform configuration.');
+        return;
+      }
+
+      // Fetch AWS credentials from the backend
+      const response = await fetch(`http://localhost:3031/api/user/${user.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch AWS credentials.');
+      }
+
+      const userData = await response.json();
+      const { awsAccessKeyId, awsSecretAccessKey } = userData;
+
+      if (!awsAccessKeyId || !awsSecretAccessKey) {
+        alert('AWS credentials are missing. Please update your AWS credentials in the User Management section.');
+        return;
+      }
+
+      // Generate Terraform configuration
     let config = `
 provider "aws" {
-  region = "${region}"
+  region     = "${region}"
+access_key = "${awsAccessKeyId}"
+  secret_key = "${awsSecretAccessKey}"
 }
 
 # EC2 Instance
@@ -99,14 +130,8 @@ resource "aws_s3_bucket" "my_bucket" {
     setTerraformConfig(config);
     setOpenSnackbar(true);
 
-    try {
-      const user = JSON.parse(localStorage.getItem('user')); // Get user from localStorage
-      if (!user || !user.id) {
-        alert('User ID is missing. Cannot save Terraform configuration.');
-        return;
-      }
-
-      const response = await fetch('http://localhost:3031/save-terraform-config', {
+    // Save the configuration to the backend
+      const saveResponse = await fetch('http://localhost:3031/save-terraform-config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -117,14 +142,14 @@ resource "aws_s3_bucket" "my_bucket" {
         }),
       });
 
-      if (response.ok) {
+      if (saveResponse.ok) {
         alert('Terraform configuration saved on the server successfully!');
       } else {
         alert('Failed to save Terraform configuration on the server.');
       }
     } catch (error) {
-      console.error('Error saving Terraform config to server:', error);
-      alert('Error saving Terraform configuration to the server.');
+      console.error('Error generating Terraform config:', error);
+      alert(error.message || 'Failed to generate Terraform configuration.');
     }
   };
 

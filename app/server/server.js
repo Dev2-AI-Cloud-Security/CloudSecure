@@ -87,11 +87,6 @@ const swaggerOptions = {
 };
 
 
-AWS.config.update({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION || 'us-east-1',
-});
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
@@ -99,12 +94,6 @@ console.log('Swagger documentation available at /api-docs');
 
 
 
-// Configure AWS SDK
-AWS.config.update({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION || 'us-east-1',
-});
 
 const cloudwatchlogs = new AWS.CloudWatchLogs();
 
@@ -1055,6 +1044,16 @@ app.post('/api/user/update', async (req, res) => {
       return res.status(404).json({ message: 'User not found.' });
     }
 
+    // Dynamically update AWS.config if AWS credentials are updated
+    if (awsAccessKeyId && awsSecretAccessKey) {
+      AWS.config.update({
+        accessKeyId: awsAccessKeyId,
+        secretAccessKey: awsSecretAccessKey,
+        region: process.env.AWS_REGION || 'us-east-1',
+      });
+      console.log('AWS SDK configuration updated for user:', userId);
+    }
+
     res.status(200).json({ message: 'User details updated successfully.', user });
   } catch (error) {
     console.error('Error updating user details:', error);
@@ -1073,6 +1072,8 @@ app.get('/api/user/:userId', async (req, res) => {
     }
 
     res.status(200).json({
+      awsAccessKeyId: user.awsAccessKeyId,
+      awsSecretAccessKey: user.awsSecretAccessKey,
       address: user.address,
       contactDetails: user.contactDetails,
       isGoogleLogin: user.isGoogleLogin,
