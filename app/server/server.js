@@ -981,6 +981,100 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/user/update:
+ *   post:
+ *     summary: Update user details
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               password:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *               contactDetails:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User details updated successfully
+ *       400:
+ *         description: No updates provided
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Failed to update user details
+ */
+app.post('/api/user/update', async (req, res) => {
+  const { userId, password, address, contactDetails } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required.' });
+  }
+
+  try {
+    const updates = {};
+
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      updates.password = await bcrypt.hash(password, salt);
+    }
+
+    if (address) {
+      updates.address = address;
+    }
+
+    if (contactDetails) {
+      updates.contactDetails = contactDetails;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'No updates provided.' });
+    }
+
+    const user = await User.findByIdAndUpdate(userId, updates, { new: true });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    res.status(200).json({ message: 'User details updated successfully.', user });
+  } catch (error) {
+    console.error('Error updating user details:', error);
+    res.status(500).json({ message: 'Failed to update user details.' });
+  }
+});
+
+app.get('/api/user/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    res.status(200).json({
+      address: user.address,
+      contactDetails: user.contactDetails,
+      isGoogleLogin: user.isGoogleLogin,
+    });
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    res.status(500).json({ message: 'Failed to fetch user details.' });
+  }
+});
+
 // Start Server
 const PORT = process.env.PORT || 3031;
 app.listen(PORT, () => {

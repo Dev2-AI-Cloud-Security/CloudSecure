@@ -36,6 +36,14 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  address: {
+    type: String, // Address field added
+    required: false,
+  },
+  contactDetails: {
+    type: String, // Contact details field added
+    required: false,
+  },
   ec2Instances: [ec2InstanceSchema], // Embed EC2 instances as an array
 });
 
