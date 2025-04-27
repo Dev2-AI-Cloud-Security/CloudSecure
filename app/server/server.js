@@ -11,6 +11,7 @@ const path = require('path');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const redis = require('redis');
+const Counter = require('./models/Counter'); // Import the Counter model
 
 const app = express();
 
@@ -886,6 +887,15 @@ app.post('/api/ec2-instances', async (req, res) => {
     user.ec2Instances.push(newInstance);
     await user.save();
 
+    // Increment the global EC2 instance counter
+    const counter = await Counter.findOneAndUpdate(
+      { name: 'totalEc2Instances' },
+      { $inc: { value: 1 } },
+      { new: true, upsert: true } // Create the counter if it doesn't exist
+    );
+
+    console.log(`Total EC2 Instances: ${counter.value}`);
+
     res.status(201).json(newInstance);
   } catch (error) {
     console.error('Error adding EC2 instance:', error);
@@ -934,6 +944,34 @@ app.post('/api/delete-ec2-instance', async (req, res) => {
   } catch (error) {
     console.error('Error deleting EC2 instance:', error);
     res.status(500).json({ message: 'Failed to delete EC2 instance.' });
+  }
+});
+
+app.get('/api/stats', async (req, res) => {
+  try {
+    // Fetch all users
+    const users = await User.find();
+
+    // Calculate the total number of users
+    const totalUsers = users.length;
+
+    // Calculate the total number of active EC2 instances
+    const totalActiveInstances = users.reduce((count, user) => {
+      return count + (user.ec2Instances ? user.ec2Instances.length : 0);
+    }, 0);
+
+    // Fetch the total EC2 instances counter
+    const counter = await Counter.findOne({ name: 'totalEc2Instances' });
+    const totalEc2Instances = counter ? counter.value : 0;
+
+    res.status(200).json({
+      totalUsers,
+      totalActiveInstances,
+      totalEc2Instances, // Include total EC2 instances in the response
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ message: 'Failed to fetch stats.' });
   }
 });
 
