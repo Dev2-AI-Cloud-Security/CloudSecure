@@ -26,11 +26,9 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: false,
-    unique: true,
   },
   googleId: {
     type: String,
-    unique: true,
   },
   isGoogleLogin: {
     type: Boolean,
