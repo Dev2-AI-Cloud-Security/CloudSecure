@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const AWS = require('aws-sdk');
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs'); // Ensure bcrypt is imported
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
 const fs = require('fs');
@@ -22,30 +22,32 @@ const generateToken = (user) => {
     username: user.username,
   };
 
-  const secretKey = process.env.JWT_SECRET || 'defaultSecretKey'; // Use a secure secret key
+  const secretKey = process.env.JWT_SECRET || 'defaultSecretKey';
   const options = {
-    expiresIn: '1h', // Token expiration time
+    expiresIn: '1h',
   };
 
   return jwt.sign(payload, secretKey, options);
 };
 
 // CORS Configuration
-const allowedOrigins = ['http://localhost:3030', 'http://localhost:3000']; // Add all allowed origins here
+const allowedOrigins = ['http://localhost:3030', 'http://localhost:3000'];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true); // Allow the request
-    } else {
-      console.error(`CORS error: Origin ${origin} not allowed`);
-      callback(new Error('Not allowed by CORS')); // Reject the request
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow these HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
-  credentials: true, // Allow cookies and credentials
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.error(`CORS error: Origin ${origin} not allowed`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 
@@ -83,24 +85,21 @@ const swaggerOptions = {
       },
     ],
   },
-  apis: ['./server.js'], // Path to the API docs
+  apis: ['./server.js'],
 };
-
-
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 console.log('Swagger documentation available at /api-docs');
-
-
-
 
 const cloudwatchlogs = new AWS.CloudWatchLogs();
 
 // MongoDB Connection
 const connectMongoDB = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://admin:secret@localhost:27017/cloudsecure?authSource=admin';
+    const mongoURI =
+      process.env.MONGODB_URI ||
+      'mongodb://admin:secret@localhost:27017/cloudsecure?authSource=admin';
     console.log('Connecting to MongoDB at:', mongoURI);
     await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
@@ -157,10 +156,12 @@ const setupLogGroupAndStream = async () => {
   }
 
   try {
-    await cloudwatchlogs.createLogStream({
-      logGroupName,
-      logStreamName,
-    }).promise();
+    await cloudwatchlogs
+      .createLogStream({
+        logGroupName,
+        logStreamName,
+      })
+      .promise();
     console.log('Log stream created');
   } catch (error) {
     if (error.code !== 'ResourceAlreadyExistsException') throw error;
@@ -200,11 +201,13 @@ const generateDummyLogs = async () => {
   logEvents.sort((a, b) => a.timestamp - b.timestamp);
 
   try {
-    await cloudwatchlogs.putLogEvents({
-      logGroupName,
-      logStreamName,
-      logEvents,
-    }).promise();
+    await cloudwatchlogs
+      .putLogEvents({
+        logGroupName,
+        logStreamName,
+        logEvents,
+      })
+      .promise();
     console.log('Dummy logs sent to CloudWatch');
   } catch (error) {
     console.error('Error sending dummy logs:', error);
@@ -221,7 +224,7 @@ initializeCloudWatch();
 // Middleware to Verify JWT
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Extract the token from the Authorization header
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     console.error('No token provided in Authorization header');
@@ -229,12 +232,11 @@ const authenticateToken = (req, res, next) => {
   }
 
   try {
-    // Verify the token and attach the decoded user to req.user
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultSecretKey', {
-      algorithms: ['HS256'], // Specify the allowed algorithms
+      algorithms: ['HS256'],
     });
-    console.log('Decoded Token:', decoded); // Debug log
-    req.user = decoded; // Attach the decoded user information to req.user
+    console.log('Decoded Token:', decoded);
+    req.user = decoded;
     next();
   } catch (error) {
     console.error('Error verifying token:', error.message);
@@ -258,21 +260,61 @@ redisClient.on('error', (err) => {
 })();
 
 // Helper function to run a CloudWatch Logs Insights query with Redis caching
-const runInsightsQueryWithCache = async (queryKey, queryString, startTime, endTime) => {
-  const MAX_RETRIES = 5; // Maximum number of retries
+const runInsightsQueryWithCache = async (
+  queryKey,
+  queryString,
+  startTime,
+  endTime,
+  {
+    redisClient = null,
+    cloudwatchlogs,
+    logGroupName,
+    cacheTTL = 3600,
+    maxPollAttempts = 30,
+  } = {} // Default to empty object to avoid destructuring errors
+) => {
+  const MAX_RETRIES = 5; // Maximum number of retries for throttling
   const RETRY_DELAY = 1000; // Initial delay in milliseconds
+  const POLL_INTERVAL = 1000; // Polling interval in milliseconds
+
+  // Input validation
+  if (!queryKey || typeof queryKey !== 'string') {
+    throw new Error('Invalid queryKey: must be a non-empty string');
+  }
+  if (!queryString || typeof queryString !== 'string') {
+    throw new Error('Invalid queryString: must be a non-empty string');
+  }
+  if (
+    !Number.isInteger(startTime) ||
+    !Number.isInteger(endTime) ||
+    startTime >= endTime
+  ) {
+    throw new Error(
+      'Invalid startTime or endTime: must be integers and startTime must be less than endTime'
+    );
+  }
+  if (!cloudwatchlogs || !logGroupName) {
+    throw new Error('Missing required dependencies: cloudwatchlogs or logGroupName');
+  }
 
   try {
-    // Check if the data is already cached in Redis
-    const cachedData = await redisClient.get(queryKey);
-    if (cachedData) {
-      console.log(`Cache hit for key: ${queryKey}`);
-      return JSON.parse(cachedData); // Return cached data
+    // Check Redis cache if redisClient is provided
+    let cachedData = null;
+    if (redisClient) {
+      try {
+        cachedData = await redisClient.get(queryKey);
+        if (cachedData) {
+          console.log(`Cache hit for key: ${queryKey}`);
+          return JSON.parse(cachedData);
+        }
+      } catch (redisError) {
+        console.warn(`Redis get error for key ${queryKey}:`, redisError.message);
+      }
     }
 
     console.log(`Cache miss for key: ${queryKey}. Querying AWS CloudWatch Logs...`);
 
-    // Run the CloudWatch Logs Insights query
+    // Start CloudWatch Logs Insights query with retry for throttling
     const params = {
       queryString,
       startTime,
@@ -280,13 +322,29 @@ const runInsightsQueryWithCache = async (queryKey, queryString, startTime, endTi
       logGroupNames: [logGroupName],
     };
 
-    const queryResponse = await cloudwatchlogs.startQuery(params).promise();
-    const queryId = queryResponse.queryId;
+    let queryId;
+    for (let retries = 0; retries <= MAX_RETRIES; retries++) {
+      try {
+        const queryResponse = await cloudwatchlogs.startQuery(params).promise();
+        queryId = queryResponse.queryId;
+        break;
+      } catch (error) {
+        if (error.code === 'ThrottlingException' && retries < MAX_RETRIES) {
+          const delay = RETRY_DELAY * Math.pow(2, retries);
+          console.warn(`ThrottlingException on startQuery: Retrying in ${delay}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        } else {
+          throw new Error(`Failed to start query: ${error.message}`);
+        }
+      }
+    }
 
+    // Poll for query results
     let results;
-    let retries = 0;
+    let pollAttempts = 0;
+    let retries = 0; // Reset retries for getQueryResults
 
-    while (true) {
+    while (pollAttempts < maxPollAttempts) {
       try {
         const resultResponse = await cloudwatchlogs.getQueryResults({ queryId }).promise();
 
@@ -294,28 +352,40 @@ const runInsightsQueryWithCache = async (queryKey, queryString, startTime, endTi
           results = resultResponse.results;
           break;
         } else if (resultResponse.status === 'Failed' || resultResponse.status === 'Cancelled') {
-          throw new Error('Query failed or was cancelled');
+          throw new Error(`Query ${resultResponse.status.toLowerCase()}: ${queryId}`);
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait before retrying
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+        pollAttempts++;
       } catch (error) {
         if (error.code === 'ThrottlingException' && retries < MAX_RETRIES) {
           retries++;
-          const delay = RETRY_DELAY * Math.pow(2, retries); // Exponential backoff
-          console.warn(`ThrottlingException: Retrying in ${delay}ms...`);
+          const delay = RETRY_DELAY * Math.pow(2, retries);
+          console.warn(`ThrottlingException on getQueryResults: Retrying in ${delay}ms...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
-          throw error; // Rethrow the error if retries are exhausted or it's not a throttling exception
+          throw new Error(`Failed to get query results: ${error.message}`);
         }
       }
     }
 
-    // Cache the results in Redis with a TTL (e.g., 1 hour)
-    await redisClient.set(queryKey, JSON.stringify(results), { EX: 3600 });
+    if (!results) {
+      throw new Error(`Query did not complete within ${maxPollAttempts} attempts`);
+    }
+
+    // Cache results in Redis if redisClient is provided
+    if (redisClient) {
+      try {
+        await redisClient.set(queryKey, JSON.stringify(results), { EX: cacheTTL });
+        console.log(`Cached results for key: ${queryKey} with TTL: ${cacheTTL}s`);
+      } catch (redisError) {
+        console.warn(`Redis set error for key ${queryKey}:`, redisError.message);
+      }
+    }
 
     return results;
   } catch (error) {
-    console.error('Error running CloudWatch Logs Insights query with cache:', error);
+    console.error('Error running CloudWatch Logs Insights query with cache:', error.message);
     throw error;
   }
 };
@@ -367,7 +437,6 @@ app.post('/api/register', async (req, res) => {
   res.status(201).json({ message: 'User registered successfully.' });
 });
 
-
 /**
  * @swagger
  * /api/login:
@@ -400,7 +469,9 @@ app.post('/api/login', async (req, res) => {
     if (isGoogleLogin) {
       // Handle Google login
       if (!email || !googleId) {
-        return res.status(400).json({ message: 'Email and Google ID are required for Google login.' });
+        return res
+          .status(400)
+          .json({ message: 'Email and Google ID are required for Google login.' });
       }
 
       // Check if the user already exists
@@ -410,24 +481,28 @@ app.post('/api/login', async (req, res) => {
         // If the user doesn't exist, create a new user
         user = new User({
           email,
-          username: email, // Set email generateTokenas the username
+          username: email,
           googleId,
           isGoogleLogin: true,
-          password: 'xx', // Password is not needed for Google login
+          password: 'xx',
         });
         await user.save();
       }
 
-      // Generate a token (you can use JWT or any other method)
-      const token = generateToken(user); // Replace with your token generation logic
+      // Generate a token
+      const token = generateToken(user);
 
-      return res.status(200).json({ token,
+      return res.status(200).json({
+        token,
         user: { id: user._id, email: user.email, username: user.username },
-        message: 'Logged in successfully', });
+        message: 'Logged in successfully',
+      });
     } else {
       // Handle traditional login
       if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required.' });
+        return res
+          .status(400)
+          .json({ message: 'Username and password are required.' });
       }
 
       const user = await User.findOne({ username });
@@ -436,8 +511,8 @@ app.post('/api/login', async (req, res) => {
         return res.status(401).json({ message: 'Invalid username or password.' });
       }
 
-      // Generate a token (you can use JWT or any other method)
-      const token = generateToken(user); // Replace with your token generation logic
+      // Generate a token
+      const token = generateToken(user);
 
       return res.json({
         token,
@@ -482,7 +557,11 @@ app.get('/api/threats', async (req, res) => {
     // Use a unique key for caching based on the query and time range
     const queryKey = `threats:${startTime}:${endTime}`;
 
-    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime);
+    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime, {
+      redisClient,
+      cloudwatchlogs,
+      logGroupName,
+    });
 
     const threats = results.map((row) => {
       const timestampField = row.find((field) => field.field === '@timestamp');
@@ -495,7 +574,7 @@ app.get('/api/threats', async (req, res) => {
 
     res.json(threats);
   } catch (error) {
-    console.error('Error fetching threats:', error);
+    console.error('Error fetching threats:', error.message);
     res.status(500).json({ error: 'Failed to fetch threats' });
   }
 });
@@ -541,7 +620,11 @@ app.get('/api/resolved-issues', async (req, res) => {
     const startTime = endTime - 365 * 24 * 60 * 60;
 
     const queryKey = `resolved-issues:${startTime}:${endTime}`;
-    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime);
+    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime, {
+      redisClient,
+      cloudwatchlogs,
+      logGroupName,
+    });
 
     const resolvedIssues = results.map((row) => {
       const timestampField = row.find((field) => field.field === '@timestamp');
@@ -554,7 +637,7 @@ app.get('/api/resolved-issues', async (req, res) => {
 
     res.json(resolvedIssues);
   } catch (error) {
-    console.error('Error fetching resolved issues:', error);
+    console.error('Error fetching resolved issues:', error.message);
     res.status(500).json({ error: 'Failed to fetch resolved issues' });
   }
 });
@@ -600,7 +683,11 @@ app.get('/api/risk-levels', async (req, res) => {
     const startTime = endTime - 24 * 60 * 60;
 
     const queryKey = `risk-levels:${startTime}:${endTime}`;
-    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime);
+    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime, {
+      redisClient,
+      cloudwatchlogs,
+      logGroupName,
+    });
 
     const riskLevels = results.map((row) => {
       const actionField = row.find((field) => field.field === 'action');
@@ -638,7 +725,7 @@ app.get('/api/risk-levels', async (req, res) => {
 
     res.json(aggregatedRiskLevels);
   } catch (error) {
-    console.error('Error fetching risk levels:', error);
+    console.error('Error fetching risk levels:', error.message);
     res.status(500).json({ error: 'Failed to fetch risk levels' });
   }
 });
@@ -672,7 +759,6 @@ app.get('/api/risk-levels', async (req, res) => {
  *       500:
  *         description: Failed to fetch alerts
  */
-
 app.get('/api/alerts', async (req, res) => {
   try {
     const queryString = `
@@ -686,7 +772,11 @@ app.get('/api/alerts', async (req, res) => {
     const startTime = endTime - 24 * 60 * 60;
 
     const queryKey = `alerts:${startTime}:${endTime}`;
-    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime);
+    const results = await runInsightsQueryWithCache(queryKey, queryString, startTime, endTime, {
+      redisClient,
+      cloudwatchlogs,
+      logGroupName,
+    });
 
     const alerts = results.map((row) => {
       const actionField = row.find((field) => field.field === 'action');
@@ -704,7 +794,7 @@ app.get('/api/alerts', async (req, res) => {
     });
     res.json(alerts);
   } catch (error) {
-    console.error('Error fetching alerts:', error);
+    console.error('Error fetching alerts:', error.message);
     res.status(500).json({ error: 'Failed to fetch alerts' });
   }
 });
@@ -737,7 +827,9 @@ app.post('/save-terraform-config', async (req, res) => {
   const { userId, config } = req.body;
 
   if (!userId || !config) {
-    return res.status(400).json({ message: 'User ID and Terraform configuration are required.' });
+    return res
+      .status(400)
+      .json({ message: 'User ID and Terraform configuration are required.' });
   }
 
   try {
@@ -760,10 +852,8 @@ app.post('/save-terraform-config', async (req, res) => {
   }
 });
 
-
 const { exec } = require('child_process');
 
-// Deploy API to run Terraform
 /**
  * @swagger
  * /deploy:
@@ -779,11 +869,10 @@ const { exec } = require('child_process');
  *         description: Failed to deploy resources
  */
 app.post('/deploy', async (req, res) => {
-
   const { userId } = req.body;
   const terraformDir = path.join(__dirname, '.terraform-user-' + userId);
   const terraformFileName = 'main.tf';
-  const terraformFilePath = path.join(terraformDir, terraformFileName); 
+  const terraformFilePath = path.join(terraformDir, terraformFileName);
 
   if (!userId) {
     return res.status(400).json({ message: 'User ID is required.' });
@@ -796,25 +885,27 @@ app.post('/deploy', async (req, res) => {
 
   try {
     // Run Terraform commands
-    exec(`cd ${terraformDir} && terraform init && terraform apply -auto-approve`, (error, stdout, stderr) => {
-      if (error) {
-        console.error('Error running Terraform:', error.message);
-        return res.status(500).send('Failed to deploy resources.');
-      }
+    exec(
+      `cd ${terraformDir} && terraform init && terraform apply -auto-approve`,
+      (error, stdout, stderr) => {
+        if (error) {
+          console.error('Error running Terraform:', error.message);
+          return res.status(500).send('Failed to deploy resources.');
+        }
 
-      if (stderr) {
-        console.error('Terraform stderr:', stderr);
-      }
+        if (stderr) {
+          console.error('Terraform stderr:', stderr);
+        }
 
-      console.log('Terraform stdout:', stdout);
-      res.send('Terraform deployment completed successfully.');
-    });
+        console.log('Terraform stdout:', stdout);
+        res.send('Terraform deployment completed successfully.');
+      }
+    );
   } catch (error) {
     console.error('Error deploying Terraform:', error.message);
     res.status(500).send('An error occurred while deploying resources.');
   }
 });
-
 
 app.get('/api/ec2-instances', async (req, res) => {
   try {
@@ -831,7 +922,7 @@ app.get('/api/ec2-instances', async (req, res) => {
     }
 
     if (!user.ec2Instances || user.ec2Instances.length === 0) {
-      return res.status(200).json([]); // Return an empty array if no instances are found
+      return res.status(200).json([]);
     }
 
     res.status(200).json(user.ec2Instances);
@@ -886,10 +977,11 @@ app.post('/api/ec2-instances', async (req, res) => {
     const counter = await Counter.findOneAndUpdate(
       { name: 'totalEc2Instances' },
       { $inc: { value: 1 } },
-      { new: true, upsert: true } // Create the counter if it doesn't exist
+      { new: true, upsert: true }
     );
 
     console.log(`Total EC2 Instances: ${counter.value}`);
+
 
     res.status(201).json(newInstance);
   } catch (error) {
@@ -899,9 +991,8 @@ app.post('/api/ec2-instances', async (req, res) => {
 });
 
 app.post('/api/delete-ec2-instance', async (req, res) => {
-
   const { userId } = req.body;
-  
+
   try {
     // Path to the Terraform configuration directory
     const terraformDir = path.join(__dirname, `.terraform-user-${userId}`);
@@ -920,20 +1011,20 @@ app.post('/api/delete-ec2-instance', async (req, res) => {
           // Clear all EC2 instances for the user
           const user = await User.findByIdAndUpdate(
             userId,
-            { $set: { ec2Instances: [] } }, // Clear the ec2Instances array
+            { $set: { ec2Instances: [] } },
             { new: true }
           );
-      
+
           if (!user) {
             return res.status(404).json({ message: 'User not found.' });
           }
-      
+
           console.log(`All EC2 instances cleared for user ${userId}.`);
-          } catch (error) {
-            console.error('Error clearing EC2 instances:', error);
-            res.status(500).json({ message: 'Failed to delete EC2 instances.' });
-          }
-          res.status(200).json({ message: 'EC2 instance deleted successfully.' });
+        } catch (error) {
+          console.error('Error clearing EC2 instances:', error);
+          res.status(500).json({ message: 'Failed to delete EC2 instances.' });
+        }
+        res.status(200).json({ message: 'EC2 instance deleted successfully.' });
       }
     );
   } catch (error) {
@@ -962,7 +1053,7 @@ app.get('/api/stats', async (req, res) => {
     res.status(200).json({
       totalUsers,
       totalActiveInstances,
-      totalEc2Instances, // Include total EC2 instances in the response
+      totalEc2Instances,
     });
   } catch (error) {
     console.error('Error fetching stats:', error);
@@ -1004,7 +1095,8 @@ app.get('/api/stats', async (req, res) => {
  *         description: Failed to update user details
  */
 app.post('/api/user/update', async (req, res) => {
-  const { userId, password, address, contactDetails, awsAccessKeyId, awsSecretAccessKey } = req.body;
+  const { userId, password, address, contactDetails, awsAccessKeyId, awsSecretAccessKey } =
+    req.body;
 
   if (!userId) {
     return res.status(400).json({ message: 'User ID is required.' });
@@ -1102,7 +1194,8 @@ app.delete('/api/user/delete', async (req, res) => {
     // Check if the user has any active EC2 instances
     if (user.ec2Instances && user.ec2Instances.length > 0) {
       return res.status(400).json({
-        message: 'Cannot delete account. Please terminate all EC2 instances before deleting your account.',
+        message:
+          'Cannot delete account. Please terminate all EC2 instances before deleting your account.',
       });
     }
 

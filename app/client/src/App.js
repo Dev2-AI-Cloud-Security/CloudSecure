@@ -13,7 +13,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import SecurityIcon from '@mui/icons-material/Security';
 import ComputerIcon from '@mui/icons-material/Computer';
 import PeopleIcon from '@mui/icons-material/People';
-import Logo from './assets/brand_logo.webp';
+import Logo from './assets/brand_logo.png';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 const TerraformForm = lazy(() => import('./components/TerraformPage'));
@@ -175,6 +175,7 @@ function AppLayout(props) {
 
   return (
     <AppProvider
+    style={{margin: 0}}
       branding={{
         logo: <img src={Logo} alt="Cloud secure" />,
         title: 'CloudSecure',
