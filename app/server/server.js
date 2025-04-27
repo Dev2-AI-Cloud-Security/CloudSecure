@@ -31,7 +31,7 @@ const generateToken = (user) => {
 };
 
 // CORS Configuration
-const allowedOrigins = ['http://localhost:3030', 'http://localhost:3000'];
+const allowedOrigins = ['http://localhost:3030', 'http://localhost:3000','http://localhost', 'http://localhost:80'];
 
 app.use(
   cors({

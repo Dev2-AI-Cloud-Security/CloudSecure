@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode'; // Use named import
 import './LoginPage.css';
-
+import { api } from '../config/api';
 function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -13,21 +13,10 @@ function LoginPage() {
   const handleSubmitLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:3031/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Login failed. Please check your credentials.');
-      }
-
-      const data = await response.json();
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const response = await api.login({ username, password });
+      const { token, user } = response;
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
 
       alert('Logged in successfully. Redirecting to landing page');
       navigate('/app');
@@ -47,19 +36,7 @@ function LoginPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:3031/api/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Registration failed. Please try again.');
-      }
-
+      await api.register({ username, password });
       alert('Registration successful. You can now login.');
       setUsername('');
       setPassword('');
@@ -83,26 +60,18 @@ function LoginPage() {
       localStorage.setItem('user', JSON.stringify(decodedToken));
 
       // Send user information to the backend using the same /api/login endpoint
-      const response = await fetch('http://localhost:3031/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: decodedToken.email, // Use email as the username
-          googleId: decodedToken.sub, // Unique Google user ID
-          isGoogleLogin: true, // Indicate that this is a Google login
-          password: '', // Password is not needed for Google login
-        }),
+     
+      const response = await api.login({
+        email: decodedToken.email,
+        googleId: decodedToken.sub,
+        isGoogleLogin: true,
+        password: '',
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to log in with Google.');
-      }
-
-      const data = await response.json();
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      console.log(response)
+      const { token, user } = response;
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
 
       alert('Logged in successfully with Google. Redirecting to landing page');
       navigate('/app');

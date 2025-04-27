@@ -2,13 +2,11 @@ version: '3.8'
 
 services:
   client:
-    image: cvcharanraj/cloudsecure-client:latest  # Pull from Docker Hub
+    image: cvcharanraj/cloudsecure-client:latest
     container_name: cloudsecure-client
     environment:
-      - REACT_APP_API_URL=http://cloudsecure-server:3030
-      - REACT_APP_API_URL=http://cloudsecure-server:3030
-      - NODE_ENV=development
-
+      - REACT_APP_API_URL=http://cloudsecure-server:3031
+      - NODE_ENV=production  # Use production for the built React app
     ports:
       - "80:80"
     depends_on:
@@ -29,18 +27,22 @@ services:
       start_period: 10s
 
   server:
-    image: cvcharanraj/cloudsecure-server:latest  # Pull from Docker Hub
+    image: cvcharanraj/cloudsecure-server:latest
     container_name: cloudsecure-server
     ports:
-      - "3030:3030"
+      - "3031:3031"  # Match the port in server.js
     depends_on:
       - redis-service
       - mongo-service
     environment:
-      - MONGODB_URI=mongodb://mongo-service:27017
-      - PORT=3030
-      - NODE_ENV=development
-
+      - MONGODB_URI=mongodb://mongo-user:mongo-password@mongo-service:27017/cloudsecure?authSource=admin
+      - REDIS_URL=redis://redis-service:6379
+      - PORT=3031
+      - NODE_ENV=production  # Use production
+      - JWT_SECRET=${JWT_SECRET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
     restart: unless-stopped
     networks:
       - app-network
@@ -50,7 +52,7 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]  # Adjust if no /health endpoint
+      test: ["CMD", "curl", "-f", "http://localhost:3031/api-docs"]  # Check Swagger endpoint
       interval: 30s
       timeout: 10s
       retries: 3
@@ -60,9 +62,9 @@ services:
     image: mongo:latest
     container_name: mongo-service
     environment:
-      MONGO_INITDB_ROOT_USERNAME: mongo-user
-      MONGO_INITDB_ROOT_PASSWORD: mongo-password
-      MONGO_INITDB_DATABASE: cloudsecure
+      - MONGO_INITDB_ROOT_USERNAME=mongo-user
+      - MONGO_INITDB_ROOT_PASSWORD=mongo-password
+      - MONGO_INITDB_DATABASE=cloudsecure
     ports:
       - "27017:27017"  # Remove in production if not needed
     volumes:
@@ -83,7 +85,7 @@ services:
       start_period: 10s
 
   redis-service:
-    image: redis:latest
+    image: redis:alpine
     container_name: redis-service
     ports:
       - "6379:6379"  # Remove in production if not needed
