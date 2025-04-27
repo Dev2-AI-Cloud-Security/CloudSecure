@@ -9,13 +9,13 @@ const LogsEventAnalysis = ({ events }) => {
   const [suggestions, setSuggestions] = useState({}); // Cache for AI suggestions
   const [loadingSuggestion, setLoadingSuggestion] = useState({}); // Loading state for each event
 
-  // Filter events based on the filter input
+  // Filter events based on the filter input (searching in the "incident" field)
   const filteredEvents = safeEvents.filter(event =>
-    event.message.toLowerCase().includes(filter.toLowerCase())
+    event.incident.toLowerCase().includes(filter.toLowerCase())
   );
 
   // Function to fetch AI suggestion from Google Generative AI API
-  const fetchAISuggestion = async (eventMessage, eventId) => {
+  const fetchAISuggestion = async (incident, eventId) => {
     // Check if suggestion is already cached
     if (suggestions[eventId]) {
       return;
@@ -36,7 +36,7 @@ const LogsEventAnalysis = ({ events }) => {
             {
               parts: [
                 {
-                  text: `Provide a concise suggestion for handling the following security event in a web application: "${eventMessage}".`,
+                  text: `Provide a concise suggestion for handling the following security incident: "${incident}".`,
                 },
               ],
             },
@@ -70,7 +70,7 @@ const LogsEventAnalysis = ({ events }) => {
         </Typography>
         <TextField
           fullWidth
-          placeholder="Filter logs..."
+          placeholder="Filter incidents..."
           variant="outlined"
           size="small"
           value={filter}
@@ -79,28 +79,31 @@ const LogsEventAnalysis = ({ events }) => {
         />
         <List>
           {filteredEvents.length > 0 ? (
-            filteredEvents.map(event => (
+            filteredEvents.map((event, index) => (
               <Tooltip
-                key={event.id}
+                key={index}
                 title={
-                  loadingSuggestion[event.id] ? (
+                  loadingSuggestion[index] ? (
                     <CircularProgress size={20} />
                   ) : (
-                    suggestions[event.id] || 'Fetching suggestion...'
+                    suggestions[index] || 'Fetching suggestion...'
                   )
                 }
-                onOpen={() => fetchAISuggestion(event.message, event.id)}
+                onOpen={() => fetchAISuggestion(event.incident, index)}
                 arrow
                 placement="right"
               >
                 <ListItem sx={{ py: 0.5 }}>
-                  <ListItemText primary={event.message} />
+                  <ListItemText
+                    primary={`Incident: ${event.incident}`}
+                    secondary={`Status: ${event.status}`}
+                  />
                 </ListItem>
               </Tooltip>
             ))
           ) : (
             <ListItem>
-              <ListItemText primary={filter ? "No events match the filter" : "No events available"} />
+              <ListItemText primary={filter ? "No incidents match the filter" : "No incidents available"} />
             </ListItem>
           )}
         </List>

@@ -122,9 +122,39 @@ resource "aws_s3_bucket" "my_bucket" {
       const response = await fetch('http://localhost:3031/deploy', {
         method: 'POST',
       });
-  
+
       if (response.ok) {
         alert('Terraform deployment completed successfully!');
+
+        // Add EC2 configuration to the user database
+        const { instanceName, instanceType, region, ami } = formData;
+        const ec2Config = {
+          instanceId: instanceName, // Use instanceName as a placeholder for instanceId
+          name: instanceName,
+          type: instanceType,
+          region,
+          ami,
+          state: 'running', // Add the `state` field
+        };
+
+        const user = JSON.parse(localStorage.getItem('user')); // Get user from localStorage
+        if (user && user.id) {
+          const saveResponse = await fetch(`http://localhost:3031/api/ec2-instances?userId=${user.id}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(ec2Config),
+          });
+
+          if (saveResponse.ok) {
+            alert('EC2 configuration saved to the user database successfully!');
+          } else {
+            alert('Failed to save EC2 configuration to the user database.');
+          }
+        } else {
+          alert('User not found. Cannot save EC2 configuration.');
+        }
       } else {
         alert('Failed to deploy Terraform configuration.');
       }

@@ -793,6 +793,54 @@ app.get('/api/ec2-instances', async (req, res) => {
   }
 });
 
+app.delete('/api/ec2-instances/:instanceId', async (req, res) => {
+  try {
+    const { instanceId } = req.params;
+
+    // Find and delete the instance from the user's EC2 instances
+    const user = await User.findOneAndUpdate(
+      { 'ec2Instances.instanceId': instanceId },
+      { $pull: { ec2Instances: { instanceId } } },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: 'Instance not found' });
+    }
+
+    res.status(200).json({ message: 'Instance deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting EC2 instance:', error);
+    res.status(500).json({ error: 'Failed to delete EC2 instance' });
+  }
+});
+
+app.post('/api/ec2-instances', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const { instanceId, name, type, region, ami, state } = req.body;
+
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const newInstance = { instanceId, name, type, region, ami, state };
+    user.ec2Instances.push(newInstance);
+    await user.save();
+
+    res.status(201).json(newInstance);
+  } catch (error) {
+    console.error('Error adding EC2 instance:', error);
+    res.status(500).json({ error: 'Failed to add EC2 instance' });
+  }
+});
+
 // Start Server
 const PORT = process.env.PORT || 3031;
 app.listen(PORT, () => {

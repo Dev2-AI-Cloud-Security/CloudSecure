@@ -4,27 +4,12 @@ const bcrypt = require('bcryptjs');
 
 // Define EC2 Instance Schema
 const ec2InstanceSchema = new mongoose.Schema({
-  instanceId: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  name: {
-    type: String,
-    required: true,
-  },
-  type: {
-    type: String,
-    required: true,
-  },
-  state: {
-    type: String,
-    required: true,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
+  instanceId: { type: String, required: true },
+  name: { type: String, required: true },
+  type: { type: String, required: true },
+  region: { type: String, required: true },
+  ami: { type: String, required: true },
+  state: { type: String, required: true }, // Ensure `state` is defined as required
 });
 
 // Define User Schema

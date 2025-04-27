@@ -57,4 +57,8 @@ export const api = {
   getAlerts: () => createApiRequest('/api/alerts', 'GET'),
   getEc2Instances: (userId) =>
     createApiRequest(`/api/ec2-instances?userId=${userId}`, 'GET'),
+  deleteEc2Instance: (instanceId) =>
+    createApiRequest(`/api/ec2-instances/${instanceId}`, 'DELETE'),
+  addEc2Instance: (userId, instanceConfig) =>
+    createApiRequest(`/api/ec2-instances?userId=${userId}`, 'POST', instanceConfig),
 };
