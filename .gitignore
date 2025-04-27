@@ -55,3 +55,4 @@ ansible/*.retry
 local_settings.py
 app/server/.terraform.lock.hcl
 app/server/terraform-config.tf
+app/server/.terraform-user-*

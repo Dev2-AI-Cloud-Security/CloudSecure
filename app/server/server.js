@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const AWS = require('aws-sdk');
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcryptjs'); // Ensure bcrypt is imported
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
 const fs = require('fs');
@@ -359,17 +359,23 @@ const runInsightsQueryWithCache = async (queryKey, queryString, startTime, endTi
  *         description: Error registering user
  */
 app.post('/api/register', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    if (await User.findOne({ username })) {
-      return res.status(400).json({ message: 'Username already exists' });
-    }
-    const newUser = new User({ username, password });
-    await newUser.save();
-    res.status(201).json({ message: 'User created successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Error registering user', error: error.message });
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ message: 'Username and password are required.' });
   }
+
+  // Check if the user already exists
+  const existingUser = await User.findOne({ username });
+  if (existingUser) {
+    return res.status(400).json({ message: 'User already exists.' });
+  }
+
+  // Create a new user
+  const newUser = new User({ username, password });
+  await newUser.save();
+
+  res.status(201).json({ message: 'User registered successfully.' });
 });
 
 
@@ -437,7 +443,7 @@ app.post('/api/login', async (req, res) => {
 
       const user = await User.findOne({ username });
 
-      if (!user || user.password !== password) {
+      if (!user || !(await bcrypt.compare(password, user.password))) {
         return res.status(401).json({ message: 'Invalid username or password.' });
       }
 

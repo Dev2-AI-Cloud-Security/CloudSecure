@@ -40,6 +40,12 @@ function LoginPage() {
   // Handle registration using backend
   const handleSubmitRegister = async (e) => {
     e.preventDefault();
+
+    if (!username || !password) {
+      alert('Username and password are required.');
+      return;
+    }
+
     try {
       const response = await fetch('http://localhost:3031/api/register', {
         method: 'POST',
@@ -50,7 +56,8 @@ function LoginPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Registration failed. Please try again.');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Registration failed. Please try again.');
       }
 
       alert('Registration successful. You can now login.');
