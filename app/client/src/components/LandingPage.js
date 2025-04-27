@@ -20,12 +20,12 @@ function LandingPage() {
   useEffect(() => {
     if (token && user) {
       if (!user.id || user.id.length !== 24) {
-        console.error('Invalid user ID format:', user.id);
+        console.error('Invalid user ID format:', user?.id);
         return;
       }
 
       // Fetch EC2 Instances
-      api.getEc2Instances(user.id) // Pass user ID to the API
+      api.getEc2Instances(user.id)
         .then(data => {
           if (data.message) {
             setEc2Instances([]); // No instances found
@@ -65,6 +65,8 @@ function LandingPage() {
           })));
         })
         .catch(err => console.error('Error fetching risk levels:', err));
+    } else {
+      console.error('Token or user is missing.');
     }
   }, [token, user]);
 

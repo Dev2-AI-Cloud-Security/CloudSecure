@@ -23,6 +23,19 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  googleId: {
+    type: String,
+    unique: true,
+  },
+  isGoogleLogin: {
+    type: Boolean,
+    default: false,
+  },
   ec2Instances: [ec2InstanceSchema], // Embed EC2 instances as an array
 });
 

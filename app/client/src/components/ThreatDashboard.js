@@ -12,35 +12,30 @@ const ThreatDashboard = () => {
   const [logEvents, setLogEvents] = useState([]); // Ensure it's initialized as an empty array
 
   // Get user from localStorage
-  const user = JSON.parse(localStorage.getItem('user')); // Parse user details from localStorage
+  const user = JSON.parse(localStorage.getItem('user')); // Retrieve user from localStorage
+  const userId = user?.id; // Extract userId
 
   useEffect(() => {
     let intervalId;
 
     const fetchEc2Instances = async () => {
-      if (!user || !user.id) {
-        console.error('User ID is missing or invalid:', user); // Debug log
-        setError('User ID is missing or invalid.');
-        setLoading(false);
-        return;
-      }
-
       try {
-        const response = await api.getEc2Instances(user.id); // Pass user ID to the API
-        if (response.message) {
-          setEc2Instances([]); // No instances found
-        } else {
-          setEc2Instances(response);
+        const response = await fetch(`http://localhost:3031/api/ec2-instances?userId=${userId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}`, // Include token if required
+          },
+        });
 
-          // Fetch Threat Data and Logs if EC2 instances are found
-          const threatResponse = await api.getThreats(); // Fetch threat data
-          setThreatData(threatResponse);
-
-          const logsResponse = await api.getAlerts(); // Fetch logs data
-          setLogEvents(logsResponse);
+        if (!response.ok) {
+          throw new Error('Failed to fetch EC2 instances');
         }
-      } catch (err) {
-        setError('Failed to fetch EC2 instances: ' + err.message);
+
+        const data = await response.json();
+        console.log('EC2 Instances:', data);
+      } catch (error) {
+        console.error('Error fetching EC2 instances:', error);
       } finally {
         setLoading(false);
       }

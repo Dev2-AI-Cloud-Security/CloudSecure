@@ -63,7 +63,7 @@ function LoginPage() {
   };
 
   // Handle Google login on the frontend
-  const handleGoogleLoginSuccess = (credentialResponse) => {
+  const handleGoogleLoginSuccess = async (credentialResponse) => {
     try {
       console.log('Google login response:', credentialResponse);
 
@@ -75,10 +75,32 @@ function LoginPage() {
       localStorage.setItem('token', credentialResponse.credential);
       localStorage.setItem('user', JSON.stringify(decodedToken));
 
+      // Send user information to the backend using the same /api/login endpoint
+      const response = await fetch('http://localhost:3031/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: decodedToken.email, // Use email as the username
+          googleId: decodedToken.sub, // Unique Google user ID
+          isGoogleLogin: true, // Indicate that this is a Google login
+          password: '', // Password is not needed for Google login
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to log in with Google.');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
       alert('Logged in successfully with Google. Redirecting to landing page');
       navigate('/app');
     } catch (error) {
-      console.error('Error decoding Google token:', error);
+      console.error('Error during Google login:', error);
       alert('Google login failed. Please try again.');
     }
   };

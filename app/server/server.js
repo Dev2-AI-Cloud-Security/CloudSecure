@@ -14,6 +14,21 @@ const redis = require('redis');
 
 const app = express();
 
+const generateToken = (user) => {
+  const payload = {
+    id: user._id,
+    email: user.email,
+    username: user.username,
+  };
+
+  const secretKey = process.env.JWT_SECRET || 'defaultSecretKey'; // Use a secure secret key
+  const options = {
+    expiresIn: '1h', // Token expiration time
+  };
+
+  return jwt.sign(payload, secretKey, options);
+};
+
 // CORS Configuration
 const allowedOrigins = ['http://localhost:3030', 'http://localhost:3000']; // Add all allowed origins here
 
@@ -384,39 +399,59 @@ app.post('/api/register', async (req, res) => {
  */
 app.post('/api/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, email, googleId, isGoogleLogin } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Username and password are required' });
-    }
-
-    const user = await User.findOne({ username });
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign(
-      { id: user._id, username: user.username },
-      process.env.JWT_SECRET || 'defaultSecretKey',
-      {
-        expiresIn: '1h',
-        algorithm: 'HS256', // Explicitly specify the algorithm
+    if (isGoogleLogin) {
+      // Handle Google login
+      if (!email || !googleId) {
+        return res.status(400).json({ message: 'Email and Google ID are required for Google login.' });
       }
-    );
 
-    res.json({
-      token,
-      user: { id: user._id, username: user.username },
-      message: 'Logged in successfully',
-    });
+      // Check if the user already exists
+      let user = await User.findOne({ email });
+
+      if (!user) {
+        // If the user doesn't exist, create a new user
+        user = new User({
+          email,
+          username: email, // Set email generateTokenas the username
+          googleId,
+          isGoogleLogin: true,
+          password: 'xx', // Password is not needed for Google login
+        });
+        await user.save();
+      }
+
+      // Generate a token (you can use JWT or any other method)
+      const token = generateToken(user); // Replace with your token generation logic
+
+      return res.status(200).json({ token,
+        user: { id: user._id, email: user.email, username: user.username },
+        message: 'Logged in successfully', });
+    } else {
+      // Handle traditional login
+      if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required.' });
+      }
+
+      const user = await User.findOne({ username });
+
+      if (!user || user.password !== password) {
+        return res.status(401).json({ message: 'Invalid username or password.' });
+      }
+
+      // Generate a token (you can use JWT or any other method)
+      const token = generateToken(user); // Replace with your token generation logic
+
+      return res.json({
+        token,
+        user: { id: user._id, email: user.email, username: user.username },
+        message: 'Logged in successfully',
+      });
+    }
   } catch (error) {
-    console.error('Error in loginUser:', error.message);
-    res.status(500).json({ message: 'Error logging in', error: error.message });
+    console.error('Error during login:', error);
+    res.status(500).json({ error: 'Failed to log in.' });
   }
 });
 
