@@ -10,7 +10,7 @@ export const apiConfig = {
 };
 
 // Utility function to create API requests with axios
-export const createApiRequest = async (endpoint, method = 'GET', data = null, token = null) => {
+export const createApiRequest = async (endpoint, method = 'GET', data = null) => {
   try {
     const config = {
       method,
@@ -18,13 +18,8 @@ export const createApiRequest = async (endpoint, method = 'GET', data = null, to
       headers: {
         ...apiConfig.headers, // Include default headers
       },
-      withCredentials: true, // Include cookies if needed (e.g., for sessions)
+      withCredentials: true, // Include cookies if needed (optional)
     };
-
-    // Add Authorization header if a token is provided
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
 
     // Add data for POST/PUT requests
     if (data) {
@@ -38,12 +33,6 @@ export const createApiRequest = async (endpoint, method = 'GET', data = null, to
     // Handle HTTP errors
     if (error.response) {
       const { status, data } = error.response;
-      if (status === 401 || status === 403) {
-        // Handle token expiration or invalid token
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.replace('/login');
-      }
       throw new Error(data.message || `HTTP error! status: ${status}`);
     } else {
       console.error(`API request failed for ${endpoint}:`, error.message);
@@ -61,9 +50,11 @@ export const api = {
   // Health check
   checkHealth: () => createApiRequest('/health'),
 
-  // Protected endpoints (require JWT token)
-  getThreats: (token) => createApiRequest('/api/threats', 'GET', null, token),
-  getResolvedIssues: (token) => createApiRequest('/api/resolved-issues', 'GET', null, token),
-  getRiskLevels: (token) => createApiRequest('/api/risk-levels', 'GET', null, token),
-  getAlerts: (token) => createApiRequest('/api/alerts', 'GET', null, token),
+  // Public endpoints (no authentication required)
+  getThreats: () => createApiRequest('/api/threats', 'GET'),
+  getResolvedIssues: () => createApiRequest('/api/resolved-issues', 'GET'),
+  getRiskLevels: () => createApiRequest('/api/risk-levels', 'GET'),
+  getAlerts: () => createApiRequest('/api/alerts', 'GET'),
+  getEc2Instances: (userId) =>
+    createApiRequest(`/api/ec2-instances?userId=${userId}`, 'GET'),
 };

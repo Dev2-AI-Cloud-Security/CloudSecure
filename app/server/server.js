@@ -22,6 +22,7 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true); // Allow the request
     } else {
+      console.error(`CORS error: Origin ${origin} not allowed`);
       callback(new Error('Not allowed by CORS')); // Reject the request
     }
   },
@@ -214,24 +215,24 @@ initializeCloudWatch();
 
 // Middleware to Verify JWT
 const authenticateToken = (req, res, next) => {
-  // Bypass authentication for localhost
-  const clientIp = req.ip || req.connection.remoteAddress;
-  if (clientIp === '::1' || clientIp === '127.0.0.1' || req.hostname === 'localhost') {
-    return next(); // Skip authentication for localhost
-  }
-
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+  const token = authHeader && authHeader.split(' ')[1]; // Extract the token from the Authorization header
 
   if (!token) {
+    console.error('No token provided in Authorization header');
     return res.status(401).json({ message: 'Access token required' });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultSecretKey');
-    req.user = decoded;
+    // Verify the token and attach the decoded user to req.user
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultSecretKey', {
+      algorithms: ['HS256'], // Specify the allowed algorithms
+    });
+    console.log('Decoded Token:', decoded); // Debug log
+    req.user = decoded; // Attach the decoded user information to req.user
     next();
   } catch (error) {
+    console.error('Error verifying token:', error.message);
     return res.status(403).json({ message: 'Invalid or expired token' });
   }
 };
@@ -253,6 +254,9 @@ redisClient.on('error', (err) => {
 
 // Helper function to run a CloudWatch Logs Insights query with Redis caching
 const runInsightsQueryWithCache = async (queryKey, queryString, startTime, endTime) => {
+  const MAX_RETRIES = 5; // Maximum number of retries
+  const RETRY_DELAY = 1000; // Initial delay in milliseconds
+
   try {
     // Check if the data is already cached in Redis
     const cachedData = await redisClient.get(queryKey);
@@ -275,16 +279,30 @@ const runInsightsQueryWithCache = async (queryKey, queryString, startTime, endTi
     const queryId = queryResponse.queryId;
 
     let results;
-    while (true) {
-      const resultResponse = await cloudwatchlogs.getQueryResults({ queryId }).promise();
+    let retries = 0;
 
-      if (resultResponse.status === 'Complete') {
-        results = resultResponse.results;
-        break;
-      } else if (resultResponse.status === 'Failed' || resultResponse.status === 'Cancelled') {
-        throw new Error('Query failed or was cancelled');
+    while (true) {
+      try {
+        const resultResponse = await cloudwatchlogs.getQueryResults({ queryId }).promise();
+
+        if (resultResponse.status === 'Complete') {
+          results = resultResponse.results;
+          break;
+        } else if (resultResponse.status === 'Failed' || resultResponse.status === 'Cancelled') {
+          throw new Error('Query failed or was cancelled');
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait before retrying
+      } catch (error) {
+        if (error.code === 'ThrottlingException' && retries < MAX_RETRIES) {
+          retries++;
+          const delay = RETRY_DELAY * Math.pow(2, retries); // Exponential backoff
+          console.warn(`ThrottlingException: Retrying in ${delay}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        } else {
+          throw error; // Rethrow the error if retries are exhausted or it's not a throttling exception
+        }
       }
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait before retrying
     }
 
     // Cache the results in Redis with a TTL (e.g., 1 hour)
@@ -385,7 +403,10 @@ app.post('/api/login', async (req, res) => {
     const token = jwt.sign(
       { id: user._id, username: user.username },
       process.env.JWT_SECRET || 'defaultSecretKey',
-      { expiresIn: '1h', issuer: 'CloudSecure' }
+      {
+        expiresIn: '1h',
+        algorithm: 'HS256', // Explicitly specify the algorithm
+      }
     );
 
     res.json({
@@ -416,7 +437,7 @@ app.post('/api/login', async (req, res) => {
  *       500:
  *         description: Failed to fetch threats
  */
-app.get('/api/threats', authenticateToken, async (req, res) => {
+app.get('/api/threats', async (req, res) => {
   try {
     const queryString = `
       fields @timestamp, action
@@ -477,7 +498,7 @@ app.get('/api/threats', authenticateToken, async (req, res) => {
  *       500:
  *         description: Failed to fetch resolved issues
  */
-app.get('/api/resolved-issues', authenticateToken, async (req, res) => {
+app.get('/api/resolved-issues', async (req, res) => {
   try {
     const queryString = `
       fields @timestamp, action
@@ -536,7 +557,7 @@ app.get('/api/resolved-issues', authenticateToken, async (req, res) => {
  *       500:
  *         description: Failed to fetch risk levels
  */
-app.get('/api/risk-levels', authenticateToken, async (req, res) => {
+app.get('/api/risk-levels', async (req, res) => {
   try {
     const queryString = `
       fields action, terminatingRuleId
@@ -621,7 +642,7 @@ app.get('/api/risk-levels', authenticateToken, async (req, res) => {
  *         description: Failed to fetch alerts
  */
 
-app.get('/api/alerts', authenticateToken, async (req, res) => {
+app.get('/api/alerts', async (req, res) => {
   try {
     const queryString = `
       fields @timestamp, action, terminatingRuleId, httpRequest.uri as uri
@@ -742,6 +763,33 @@ app.post('/deploy', async (req, res) => {
   } catch (error) {
     console.error('Error deploying Terraform:', error.message);
     res.status(500).send('An error occurred while deploying resources.');
+  }
+});
+
+
+app.get('/api/ec2-instances', async (req, res) => {
+  try {
+    const userId = req.query.userId;
+
+    // Validate userId
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (!user.ec2Instances || user.ec2Instances.length === 0) {
+      return res.status(200).json({ message: 'No EC2 instances found for this user' });
+    }
+
+    res.status(200).json(user.ec2Instances);
+  } catch (error) {
+    console.error('Error fetching EC2 instances:', error);
+    res.status(500).json({ error: 'Failed to fetch EC2 instances' });
   }
 });
 

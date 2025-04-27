@@ -1,61 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { Grid, Card, CardContent, Typography, Box, CircularProgress } from '@mui/material';
 import { api } from '../config/api';
-import ThreatVisualizationChart from './ThreatVisualizationChart';
-import LogsEventAnalysis from './LogsEventAnalysis';
 
 const ThreatDashboard = () => {
-  const [threats, setThreats] = useState([]);
-  const [alerts, setAlerts] = useState([]);
+  const [ec2Instances, setEc2Instances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Get token from localStorage
-  const token = localStorage.getItem('token');
+  // Get user from localStorage
+  const user = JSON.parse(localStorage.getItem('user')); // Parse user details from localStorage
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!token) {
-        setError('No authentication token found');
+    let intervalId;
+
+    const fetchEc2Instances = async () => {
+      if (!user || !user.id) {
+        console.error('User ID is missing or invalid:', user); // Debug log
+        setError('User ID is missing or invalid.');
         setLoading(false);
         return;
       }
 
       try {
-        // Fetch threats and alerts concurrently
-        const [threatsData, alertsData] = await Promise.all([
-          api.getThreats(token).catch(() => []),
-          api.getAlerts(token).catch(() => []),
-        ]);
-
-        // Set threats data
-        setThreats(
-          Array.isArray(threatsData)
-            ? threatsData.map(item => ({
-                timestamp: new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                count: item.count,
-              }))
-            : []
-        );
-
-        // Set alerts data
-        setAlerts(
-          Array.isArray(alertsData)
-            ? alertsData.map((item, index) => ({
-                id: index + 1,
-                message: `Event ${index + 1}: ${item.incident} (${item.status})`,
-              }))
-            : []
-        );
+        const response = await api.getEc2Instances(user.id); // Pass user ID to the API
+        if (response.message) {
+          setEc2Instances([]); // No instances found
+        } else {
+          setEc2Instances(response);
+        }
       } catch (err) {
-        setError('Failed to fetch data: ' + err.message);
+        setError('Failed to fetch EC2 instances: ' + err.message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [token]);
+    // Fetch EC2 instances immediately
+    fetchEc2Instances();
+
+    // Set up polling every 30 seconds
+    intervalId = setInterval(fetchEc2Instances, 30000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   if (loading) {
     return (
@@ -81,23 +69,30 @@ const ThreatDashboard = () => {
         Threat Dashboard
       </Typography>
       <Grid container spacing={3}>
-        {/* Real-time Threat Visualization */}
-        <Grid item xs={12} md={8}>
+        {/* EC2 Instances */}
+        <Grid item xs={12}>
           <Card sx={{ borderRadius: 2, boxShadow: 3 }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Real-time Threat Visualization
+                EC2 Instances
               </Typography>
-              <ThreatVisualizationChart data={threats} />
-              <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
-                AI-powered charts on attack vectors.
-              </Typography>
+              {ec2Instances.length === 0 ? (
+                <Typography variant="body1" color="textSecondary">
+                  No EC2 instances found. Add a new instance from the Infrastructure page.
+                </Typography>
+              ) : (
+                <ul>
+                  {ec2Instances.map((instance, index) => (
+                    <li key={index}>
+                      <Typography variant="body1">
+                        Instance ID: {instance.instanceId}, Name: {instance.name}
+                      </Typography>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </CardContent>
           </Card>
-        </Grid>
-        {/* Logs & Event Analysis */}
-        <Grid item xs={12} md={4}>
-          <LogsEventAnalysis events={alerts} />
         </Grid>
       </Grid>
     </div>

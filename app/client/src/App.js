@@ -1,5 +1,6 @@
-import * as React from 'react';
-import {useState} from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Assuming you're using React Router
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { lazy, Suspense } from 'react';
 import { createTheme } from '@mui/material/styles';
@@ -12,10 +13,8 @@ import HomeIcon from '@mui/icons-material/Home';
 import SecurityIcon from '@mui/icons-material/Security';
 import ComputerIcon from '@mui/icons-material/Computer';
 import PeopleIcon from '@mui/icons-material/People';
-// import UserManagement from './components/UserManagement/UserManagement.';
 import Logo from './assets/brand_logo.webp';
 import LogoutIcon from '@mui/icons-material/Logout';
-
 
 const TerraformForm = lazy(() => import('./components/TerraformPage'));
 const LandingPage = lazy(() => import('./components/LandingPage'));
@@ -52,8 +51,7 @@ const NAVIGATION = [
     segment: 'logout',
     title: 'Logout',
     icon: <LogoutIcon />,
-  }
- 
+  },
 ];
 
 const demoTheme = createTheme({
@@ -98,7 +96,7 @@ function DemoPageContent({ pathname }) {
         localStorage.removeItem('user');
         // Redirect to login page
         window.location.replace('/login');
-      }
+      };
       break;
     default:
       Component = () => (
@@ -125,34 +123,34 @@ function AppLayout(props) {
   const demoWindow = window !== undefined ? window() : undefined;
   const [showChat, setShowChat] = useState(false);
   const [messages, setMessages] = useState([]);
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3031";
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3031';
 
   const toggleChat = () => {
     setShowChat(!showChat);
   };
 
   const sendMessage = async () => {
-    const input = document.getElementById("userInput");
+    const input = document.getElementById('userInput');
     const message = input.value.trim();
     if (!message) return;
-    setMessages((prev) => [...prev, { sender: "You", text: message }]);
-    input.value = "";
+    setMessages((prev) => [...prev, { sender: 'You', text: message }]);
+    input.value = '';
 
     try {
       const res = await fetch(`${API_URL}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message }),
       });
 
       const data = await res.json();
-      setMessages((prev) => [...prev, { sender: "Bot", text: data.reply }]);
+      setMessages((prev) => [...prev, { sender: 'Bot', text: data.reply }]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { sender: "Bot", text: "Error contacting chatbot server." },
+        { sender: 'Bot', text: 'Error contacting chatbot server.' },
       ]);
-      console.error("Chatbot error:", error);
+      console.error('Chatbot error:', error);
     }
   };
 
@@ -163,6 +161,17 @@ function AppLayout(props) {
     // Redirect to login page
     router.navigate('/login');
   };
+
+  // Check user session on app load
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+
+    if (!token || !user) {
+      // Redirect to login if no session exists
+      router.navigate('/login');
+    }
+  }, [router]);
 
   return (
     <AppProvider
@@ -176,75 +185,66 @@ function AppLayout(props) {
       theme={demoTheme}
       window={demoWindow}
     >
-      
       <DashboardLayout>
         <DemoPageContent pathname={router.pathname} />
       </DashboardLayout>
       <>
-    {/* Floating Chatbot */}
-    <div
-    id="chatbot-toggle"
-    onClick={toggleChat}
-    style={{
-      position: "fixed",
-      bottom: "20px",
-      right: "20px",
-      color: "#1976d3",
-      cursor: "pointer"
-      // background: "#007bff",
-      // color: "white",
-      // padding: "10px",
-      // borderRadius: "50%",
-      // cursor: "pointer",
-      // zIndex: 1000,
-    }}
-  >
-    <SmartToyIcon fontSize={'large'}/>
-  </div>
-  {showChat && (
-    <div
-      id="chatbot-container"
-      style={{
-        position: "fixed",
-        bottom: "80px",
-        right: "20px",
-        width: "300px",
-        maxHeight: "400px",
-        background: "white",
-        border: "1px solid #ccc",
-        borderRadius: "10px",
-        overflow: "auto",
-        zIndex: 1000,
-        padding: "10px",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <div
-        id="chatbox"
-        style={{ height: "300px", overflowY: "scroll", marginBottom: "10px" }}
-      >
-        {messages.map((msg, idx) => (
-          <div key={idx}>
-            <b>{msg.sender}:</b> {msg.text}
+        {/* Floating Chatbot */}
+        <div
+          id="chatbot-toggle"
+          onClick={toggleChat}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            color: '#1976d3',
+            cursor: 'pointer',
+          }}
+        >
+          <SmartToyIcon fontSize={'large'} />
+        </div>
+        {showChat && (
+          <div
+            id="chatbot-container"
+            style={{
+              position: 'fixed',
+              bottom: '80px',
+              right: '20px',
+              width: '300px',
+              maxHeight: '400px',
+              background: 'white',
+              border: '1px solid #ccc',
+              borderRadius: '10px',
+              overflow: 'auto',
+              zIndex: 1000,
+              padding: '10px',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              id="chatbox"
+              style={{ height: '300px', overflowY: 'scroll', marginBottom: '10px' }}
+            >
+              {messages.map((msg, idx) => (
+                <div key={idx}>
+                  <b>{msg.sender}:</b> {msg.text}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '5px' }}>
+              <input
+                type="text"
+                id="userInput"
+                placeholder="Ask something..."
+                style={{ flex: 1 }}
+              />
+              <button onClick={sendMessage}>Send</button>
+            </div>
           </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: "5px" }}>
-        <input
-          type="text"
-          id="userInput"
-          placeholder="Ask something..."
-          style={{ flex: 1 }}
-        />
-        <button onClick={sendMessage}>Send</button>
-      </div>
-    </div>
-  )}
-  </>
+        )}
+      </>
     </AppProvider>
-  
-
   );
 }
 
