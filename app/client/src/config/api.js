@@ -1,8 +1,17 @@
 import axios from 'axios';
+// Dynamically set the baseURL based on the current host
+const getBaseURL = () => {
+  // In the browser, use window.location to get the current host
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.host}`;
+  }
+  // Fallback for non-browser environments (e.g., server-side rendering)
+  return 'http://localhost';
+};
 
 // Base configuration for API requests
 export const apiConfig = {
-  baseURL: '/',
+  baseURL: getBaseURL(), // Dynamically set to http://localhost or http://ec2-3-93-0-52.compute-1.amazonaws.com
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -14,7 +23,7 @@ export const createApiRequest = async (endpoint, method = 'GET', data = null) =>
   try {
     const config = {
       method,
-      url: `${apiConfig.baseURL}${endpoint}`,
+      url: `${endpoint}`,
       headers: {
         ...apiConfig.headers, // Include default headers
       },
