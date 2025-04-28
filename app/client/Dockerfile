@@ -11,7 +11,10 @@ RUN npm install
 
 # Copy source code
 COPY . .
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
 
+RUN echo "REACT_APP_API_URL is: $REACT_APP_API_URL"
 # Build the application
 RUN npm run build
 
