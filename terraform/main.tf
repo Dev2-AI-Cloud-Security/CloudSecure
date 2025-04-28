@@ -93,7 +93,7 @@ provider "aws" {
 
 # Fetch the existing EC2 instance
 data "aws_instance" "cloudsecure" {
-  instance_id = "i-09d40ec294becfbed"
+  instance_id = "i-027cde1f5f8506eb1"
 }
 
 # Output the existing instance's public IP

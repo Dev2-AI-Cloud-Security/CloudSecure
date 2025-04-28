@@ -391,13 +391,9 @@ jobs:
               echo "MongoDB not ready after 5 minutes"
               exit 1
             fi
-            # Clear the entire cloudsecure database
-            echo "Dropping the cloudsecure database..."
-            docker exec mongo-service mongosh -u mongo-user -p mongo-password cloudsecure --eval "db.dropDatabase()" || {
-              echo "Failed to drop cloudsecure database"
-              exit 1
-            }
-            echo "cloudsecure database dropped successfully"
+            # Clean up documents with googleId: null
+            echo "Cleaning up documents with googleId: null..."
+            docker exec mongo-service mongosh -u mongo-user -p mongo-password cloudsecure --eval "db.users.deleteMany({ googleId: null })"
             # Verify containers
             docker ps
           EOF
