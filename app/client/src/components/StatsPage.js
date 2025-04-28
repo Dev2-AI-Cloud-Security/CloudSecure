@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, CircularProgress, Card, CardContent } from '@mui/material';
-const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3031';
+
 const StatsPage = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -9,7 +9,7 @@ const StatsPage = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${baseURL}/api/stats`);
+        const response = await fetch(`/api/stats`);
         if (!response.ok) {
           throw new Error('Failed to fetch stats.');
         }

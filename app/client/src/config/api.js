@@ -1,9 +1,8 @@
 import axios from 'axios';
 
 // Base configuration for API requests
-console.log(process.env.REACT_APP_API_URL);
 export const apiConfig = {
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3031',
+  baseURL: '/',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

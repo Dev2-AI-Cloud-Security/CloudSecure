@@ -75,7 +75,7 @@ try {
       }
 
       // Fetch AWS credentials from the backend
-      const response = await fetch(`${baseURL}/api/user/${user.id}`, {
+      const response = await fetch(`/api/user/${user.id}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +131,7 @@ resource "aws_s3_bucket" "my_bucket" {
     setOpenSnackbar(true);
 
     // Save the configuration to the backend
-      const saveResponse = await fetch(`${baseURL}/save-terraform-config`, {
+      const saveResponse = await fetch(`/save-terraform-config`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +163,7 @@ resource "aws_s3_bucket" "my_bucket" {
         return;
       }
 
-      const response = await fetch(`${baseURL}/deploy`, {
+      const response = await fetch(`/deploy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,7 +187,7 @@ resource "aws_s3_bucket" "my_bucket" {
           state: 'running', // Add the `state` field
         };
         await api.initializeCloudWatch();
-        const saveResponse = await fetch(`${baseURL}/api/ec2-instances?userId=${user.id}`, {
+        const saveResponse = await fetch(`/api/ec2-instances?userId=${user.id}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

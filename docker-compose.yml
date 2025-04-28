@@ -5,7 +5,6 @@ services:
     image: cvcharanraj/cloudsecure-client:latest
     container_name: cloudsecure-client
     environment:
-      - REACT_APP_API_URL=http://cloudsecure-server:3031
       - NODE_ENV=production  # Use production for the built React app
     ports:
       - "80:80"

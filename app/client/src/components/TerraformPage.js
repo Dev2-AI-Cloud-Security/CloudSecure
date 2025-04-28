@@ -46,7 +46,7 @@ function TerraformPage() {
       }
 
       try {
-        const response = await fetch(`${baseURL}/api/user/${userId}`, {
+        const response = await fetch(`/api/user/${userId}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -81,7 +81,7 @@ function TerraformPage() {
   const handleDeleteInstance = async () => {
     setIsDeleting(true); // Show progress circle
     try {
-      const response = await fetch(`${baseURL}/api/delete-ec2-instance`, {
+      const response = await fetch(`/api/delete-ec2-instance`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

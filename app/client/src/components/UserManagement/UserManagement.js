@@ -31,7 +31,7 @@ const UserManagement = () => {
           return;
         }
 
-        const response = await fetch(`${baseURL}/api/user/${userId}`, {
+        const response = await fetch(`/api/user/${userId}`, {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${token}`, // Include token for authentication
@@ -100,7 +100,7 @@ const UserManagement = () => {
         return;
       }
 
-      const response = await fetch(`${baseURL}/api/user/update`, {
+      const response = await fetch(`/api/user/update`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -140,7 +140,7 @@ const UserManagement = () => {
         return;
       }
 
-      const response = await fetch(`${baseURL}/api/user/delete`, {
+      const response = await fetch(`/api/user/delete`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
