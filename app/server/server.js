@@ -31,7 +31,7 @@ const generateToken = (user) => {
 };
 
 // CORS Configuration
-const allowedOrigins = ['http://localhost:3030', 'http://localhost:3000','http://localhost', 'http://localhost:80', 'http://ec2-98-83-6-210.compute-1.amazonaws.com'];
+const allowedOrigins = ['http://localhost:3030', 'http://localhost:3000', 'http://localhost', 'http://localhost:80','http://ec2-3-93-0-52.compute-1.amazonaws.com'];
 
 app.use(
   cors({
@@ -430,25 +430,65 @@ const runInsightsQueryWithCache = async (
  *       500:
  *         description: Error registering user
  */
+
+// POST /api/register route
 app.post('/api/register', async (req, res) => {
-  const { username, password } = req.body;
+  try {
+    const { username, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ message: 'Username and password are required.' });
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required.' });
+    }
+
+    // Check if the user already exists
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists.' });
+    }
+
+    // Create a new user
+    const newUser = new User({ username, password });
+    await newUser.save();
+
+    // Return success response
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully.',
+      data: {
+        user: {
+          id: newUser._id,
+          username: newUser.username
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error during registration:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
   }
-
-  // Check if the user already exists
-  const existingUser = await User.findOne({ username });
-  if (existingUser) {
-    return res.status(400).json({ message: 'User already exists.' });
-  }
-
-  // Create a new user
-  const newUser = new User({ username, password });
-  await newUser.save();
-
-  res.status(201).json({ message: 'User registered successfully.' });
 });
+// app.post('/api/register', async (req, res) => {
+//   const { username, password } = req.body;
+
+//   if (!username || !password) {
+//     return res.status(400).json({ message: 'Username and password are required.' });
+//   }
+
+//   // Check if the user already exists
+//   const existingUser = await User.findOne({ username });
+//   if (existingUser) {
+//     return res.status(400).json({ message: 'User already exists.' });
+//   }
+
+//   // Create a new user
+//   const newUser = new User({ username, password });
+//   await newUser.save();
+
+//   res.status(201).json({ message: 'User registered successfully.' });
+// });
 
 /**
  * @swagger

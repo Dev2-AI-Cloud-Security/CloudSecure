@@ -26,13 +26,17 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: false,
+    sparse: true,
   },
   googleId: {
     type: String,
+    sparse: true,
+    default: null,
   },
   isGoogleLogin: {
     type: Boolean,
     default: false,
+    sparse: true,
   },
   address: {
     type: String,
@@ -45,10 +49,12 @@ const userSchema = new mongoose.Schema({
   awsAccessKeyId: {
     type: String, // AWS Access Key ID
     required: false,
+    sparse: true,
   },
   awsSecretAccessKey: {
     type: String, // AWS Secret Access Key
     required: false,
+    sparse: true,
   },
   ec2Instances: [ec2InstanceSchema], // Embed EC2 instances as an array
 });
