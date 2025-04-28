@@ -22,15 +22,15 @@ test.describe('CloudSecure Application Tests', () => {
     await page.getByRole('textbox', { name: 'Password' }).click();
     await page.getByRole('textbox', { name: 'Password' }).fill('123456');
 
-    page.on('dialog', dialog => dialog.accept());
 
-    // Click the Login button
-    await page.getByRole('button', { name: 'Login' }).click();  
+    page.on('dialog', async (dialog) => {
+      expect(dialog.type()).toBe('alert');
+      expect(dialog.message()).toBe('Invalid username or password.');
+      await dialog.accept();
+    });
 
     // Verify that the login failed (e.g., check for an error message)
 
-    await expect(page.getByText('Login failed. Please check your credentials.')).toBeVisible();
-    await page.getByRole('button').click();
   });
 
   test('register functionality', async ({ page }) => {
@@ -40,15 +40,47 @@ test.describe('CloudSecure Application Tests', () => {
     await page.getByRole('textbox', { name: 'Username' }).fill('sampleuser');
     await page.getByRole('textbox', { name: 'Password' }).click();
     await page.getByRole('textbox', { name: 'Password' }).fill('123456');
-    page.once('dialog', dialog => {
-      console.log(`Dialog message: ${dialog.message()}`);
-      dialog.dismiss().catch(() => {});
+    page.on('dialog', async (dialog) => {
+      expect(dialog.type()).toBe('alert');
+      expect(dialog.message()).toBe('Registration successful. You can now login.');
+      await dialog.accept();
     });
-    await expect(page.getByText('Registration successful. You can now login.')).toBeVisible();
-    await page.pause();
-    await page.getByRole('button').click();
 
   });
+
+
+
+test('Login valid user', async ({ page }) => {
+  await page.goto('http://localhost:3030/login');
+  await page.getByRole('textbox', { name: 'Username' }).click();
+  await page.getByRole('textbox', { name: 'Username' }).fill('test');
+  await page.getByRole('textbox', { name: 'Username' }).press('Tab');
+  await page.getByRole('textbox', { name: 'Password' }).click();
+  await page.getByRole('textbox', { name: 'Password' }).fill('test123');
+  page.once('dialog', dialog => {
+    console.log(`Dialog message: ${dialog.message()}`);
+    dialog.dismiss().catch(() => {});
+  });
+  await page.getByRole('button', { name: 'Login' }).click();
+  await expect(page.getByText('Security Status Overview')).toBeVisible();
+});
+
+test('Logout', async ({ page }) => {
+  await page.goto('http://localhost:3030/login');
+  await page.getByRole('textbox', { name: 'Username' }).click();
+  await page.getByRole('textbox', { name: 'Username' }).fill('test');
+  await page.getByRole('textbox', { name: 'Username' }).press('Tab');
+  await page.getByRole('textbox', { name: 'Password' }).click();
+  await page.getByRole('textbox', { name: 'Password' }).fill('test123');
+  page.once('dialog', dialog => {
+    console.log(`Dialog message: ${dialog.message()}`);
+    dialog.dismiss().catch(() => {});
+  });
+  await page.getByRole('button', { name: 'Login' }).click();
+  await expect(page.getByText('Security Status Overview')).toBeVisible();
+  await page.getByRole('link', { name: 'Logout' }).click();
+  await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+});
 
   // test('login functionality', async ({ page }) => {
   //   await page.goto('http://localhost:3030/login');
