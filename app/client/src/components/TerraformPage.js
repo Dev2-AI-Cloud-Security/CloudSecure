@@ -3,6 +3,7 @@ import Layout from './TerraformLayout';
 import TerraformForm from './TerraformForm';
 import { api } from '../config/api';
 import { Box, Typography, Button, CircularProgress, Backdrop, Alert } from '@mui/material';
+const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3031';
 
 function TerraformPage() {
   const [ec2Instances, setEc2Instances] = useState([]);
@@ -45,7 +46,7 @@ function TerraformPage() {
       }
 
       try {
-        const response = await fetch(`http://localhost:3031/api/user/${userId}`, {
+        const response = await fetch(`${baseURL}/api/user/${userId}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -80,7 +81,7 @@ function TerraformPage() {
   const handleDeleteInstance = async () => {
     setIsDeleting(true); // Show progress circle
     try {
-      const response = await fetch('http://localhost:3031/api/delete-ec2-instance', {
+      const response = await fetch(`${baseURL}/api/delete-ec2-instance`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

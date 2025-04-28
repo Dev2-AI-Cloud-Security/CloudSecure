@@ -6,6 +6,7 @@ import {
   Typography,
   Divider,
 } from '@mui/material';
+const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3031';
 
 const UserManagement = () => {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -30,7 +31,7 @@ const UserManagement = () => {
           return;
         }
 
-        const response = await fetch(`http://localhost:3031/api/user/${userId}`, {
+        const response = await fetch(`${baseURL}/api/user/${userId}`, {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${token}`, // Include token for authentication
@@ -99,7 +100,7 @@ const UserManagement = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:3031/api/user/update', {
+      const response = await fetch(`${baseURL}/api/user/update`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -139,7 +140,7 @@ const UserManagement = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:3031/api/user/delete', {
+      const response = await fetch(`${baseURL}/api/user/delete`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { saveAs } from 'file-saver';
 import { Backdrop } from '@mui/material'; // Import Backdrop
 import { api } from '../config/api';
-
+const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3031';
 import {
   Card,
   CardContent,
@@ -75,7 +75,7 @@ try {
       }
 
       // Fetch AWS credentials from the backend
-      const response = await fetch(`http://localhost:3031/api/user/${user.id}`, {
+      const response = await fetch(`${baseURL}/api/user/${user.id}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +131,7 @@ resource "aws_s3_bucket" "my_bucket" {
     setOpenSnackbar(true);
 
     // Save the configuration to the backend
-      const saveResponse = await fetch('http://localhost:3031/save-terraform-config', {
+      const saveResponse = await fetch(`${baseURL}/save-terraform-config`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +163,7 @@ resource "aws_s3_bucket" "my_bucket" {
         return;
       }
 
-      const response = await fetch('http://localhost:3031/deploy', {
+      const response = await fetch(`${baseURL}/deploy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,7 +187,7 @@ resource "aws_s3_bucket" "my_bucket" {
           state: 'running', // Add the `state` field
         };
         await api.initializeCloudWatch();
-        const saveResponse = await fetch(`http://localhost:3031/api/ec2-instances?userId=${user.id}`, {
+        const saveResponse = await fetch(`${baseURL}/api/ec2-instances?userId=${user.id}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
