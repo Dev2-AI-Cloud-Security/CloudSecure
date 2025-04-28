@@ -183,6 +183,7 @@ jobs:
             # Run Docker Compose
             cd /home/ec2-user/cloudsecure
             docker-compose down --remove-orphans
+            docker-compose pull
             docker-compose up -d
             # Verify containers
             docker ps
